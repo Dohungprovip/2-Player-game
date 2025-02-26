@@ -1,0 +1,16 @@
+backend:
+  name: github
+  repo: your-username/my-website  # Thay your-username bằng tên GitHub của bạn
+  branch: main  # Nhánh chính của repo
+
+media_folder: "images/uploads"  # Nơi lưu hình ảnh
+public_folder: "/images/uploads"
+
+collections:
+  - name: "posts"
+    label: "Bài viết"
+    folder: "posts"
+    create: true
+    fields:
+      - { name: "title", label: "Tiêu đề", widget: "string" }
+      - { name: "body", label: "Nội dung", widget: "markdown" }
