@@ -1,7 +1,7 @@
 backend:
   name: github
   repo: Dohungprovip/2-Player-game
-  branch: main 
+  branch: main
 
 media_folder: "images/uploads"
 public_folder: "/images/uploads"
