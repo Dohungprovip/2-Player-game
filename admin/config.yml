@@ -1,6 +1,6 @@
 backend:
   name: github
-  repo: your-username/my-website  # Thay your-username bằng tên GitHub của bạn
+  repo: Dohungprovip  # Thay your-username bằng tên GitHub của bạn
   branch: main  # Nhánh chính của repo
 
 media_folder: "images/uploads"  # Nơi lưu hình ảnh
