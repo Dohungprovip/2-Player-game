@@ -1,6 +1,6 @@
 backend:
   name: github
-  repo: Dohungprovip/game-2-player
+  repo: Dohungprovip/2-Player-game
   branch: main 
 
 media_folder: "images/uploads"
