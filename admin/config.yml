@@ -1,9 +1,9 @@
 backend:
   name: github
-  repo: Dohungprovip  # Thay your-username bằng tên GitHub của bạn
-  branch: main  # Nhánh chính của repo
+  repo: Dohungprovip/game-2-player
+  branch: main 
 
-media_folder: "images/uploads"  # Nơi lưu hình ảnh
+media_folder: "images/uploads"
 public_folder: "/images/uploads"
 
 collections:
