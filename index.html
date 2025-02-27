@@ -65,7 +65,7 @@
       box-shadow: 0 0 20px rgba(0,0,0,0.7);
       background: #444;
     }
-    /* Game Zones – giữ nguyên style và vị trí */
+    /* Game Zones – giữ nguyên vị trí & style */
     .zone, .sword-zone, .u-zone, .special-zone {
       position: absolute;
       width: 80px;
@@ -100,8 +100,7 @@
     #right-counter-zone { right: 120px; bottom: 20px; }
     #right-u-zone { right: 220px; bottom: 20px; }
     #left-special-zone { left: 20px; bottom: 120px; }
-    /* Ẩn phần chọn class của đối thủ vì chỉ có 1 player */
-    #right-special-zone { display: none; }
+    #right-special-zone { right: 20px; bottom: 120px; }
     .special-zone::before {
       content: "☝";
       font-size: 50px;
@@ -158,49 +157,10 @@
     .overlay-screen button:hover {
       background: linear-gradient(135deg, #777, #999);
     }
-    /* Giao diện chọn class cho local player */
-    <style id="classSelectStyle">
-    #characterSelectScreen {
+    /* Ẩn giao diện nhập tên & chọn nhân vật */
+    #nameScreen, #characterSelectScreen {
       display: none;
-      flex-direction: column;
-      align-items: center;
-      gap: 20px;
     }
-    #characterOptions {
-      display: flex;
-      gap: 10px;
-      overflow-x: auto;
-      width: 90%;
-      padding: 10px;
-    }
-    .character-option {
-      border: 2px solid #fff;
-      padding: 10px;
-      border-radius: 10px;
-      width: 100px;
-      height: 100px;
-      text-align: center;
-      flex-shrink: 0;
-      transition: border-color 0.3s ease;
-      cursor: pointer;
-    }
-    .character-option.selected {
-      border-color: gold;
-    }
-    </style>
-    /* Giao diện nhập tên cho local player */
-    <style id="nameScreenStyle">
-    #nameScreen {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      gap: 20px;
-    }
-    #nameInputs {
-      display: flex;
-      gap: 20px;
-    }
-    </style>
     /* Giao diện ghép trận với spinner */
     #waitingScreen {
       display: none;
@@ -239,7 +199,7 @@
   <div id="instructionScreen" class="overlay-screen">
     <h1>Hướng dẫn</h1>
     <p>
-      Di chuyển: Sử dụng WASD cho local player, mũi tên cho đối thủ<br>
+      Di chuyển: sử dụng WASD cho local player, mũi tên cho đối thủ<br>
       Đánh thường: Space (local) – Enter (đối thủ)<br>
       Skill 1: C (local) – / (đối thủ)<br>
       Skill 2: B (local) – ' (đối thủ)<br>
@@ -273,35 +233,6 @@
     <button id="backFromInfo">Quay lại</button>
   </div>
   
-  <!-- Character Selection Screen (chọn class cho local player) -->
-  <div id="characterSelectScreen" class="overlay-screen">
-    <h1>Chọn nhân vật</h1>
-    <div id="characterOptions">
-      <div id="left-character-select">
-        <h2>Chọn lớp nhân vật</h2>
-        <div class="character-option selected" data-character="knight">
-          <h3>Knight</h3>
-        </div>
-        <div class="character-option" data-character="archer">
-          <h3>Archer</h3>
-        </div>
-        <div class="character-option" data-character="mage">
-          <h3>Mage</h3>
-        </div>
-      </div>
-    </div>
-    <button id="confirmCharacterButton">Tiếp theo</button>
-  </div>
-  
-  <!-- Name Screen (nhập tên) -->
-  <div id="nameScreen" class="overlay-screen">
-    <h1>Nhập tên của bạn</h1>
-    <div id="nameInputs">
-      <input type="text" id="playerName" placeholder="Nhập tên của bạn" />
-    </div>
-    <button id="findMatchButton">Tìm trận</button>
-  </div>
-  
   <!-- Waiting Screen: giao diện ghép trận với spinner -->
   <div id="waitingScreen" class="overlay-screen">
     <h1>Đang tìm trận...</h1>
@@ -311,18 +242,19 @@
   <canvas id="gameCanvas" width="800" height="600"></canvas>
   
   <script>
-    // --- Global Variables & Key State ---
-    let player, opponent;
-    let localName = "";
-    let selectedCharacterLeft = "knight";
-    let roomId = null;
-    let keys = {};
-    document.addEventListener("keydown", (e) => { 
-      keys[e.key] = true;
-      // Emit key event cho server nếu cần
-      if(socket.connected) socket.emit("player_move", { roomId, playerId: socket.id, key: e.key });
+    // --- Global Variables ---
+    let player;      // local player
+    let opponent;    // opponent player
+    let localName;   // tên người chơi nhập qua prompt
+    let selectedCharacterLeft = "knight"; // lựa chọn nhân vật của local player (có thể cho chọn trên UI)
+    const socket = io("https://game-cua-dohung.onrender.com");
+    
+    // --- Socket & Key Event ---
+    document.addEventListener("keydown", (e) => {
+      if (socket.connected) {
+        socket.emit("player_move", { roomId, playerId: socket.id, key: e.key });
+      }
     });
-    document.addEventListener("keyup", (e) => { keys[e.key] = false; });
     
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
@@ -334,7 +266,7 @@
       return Math.min(Math.max(val, min), max);
     }
     
-    // --- Skill Cooldown Function (giữ nguyên) ---
+    // --- Skill Cooldown ---
     function startSkillCooldown(overlayId, timerId, duration) {
       const overlay = document.getElementById(overlayId);
       const timerElem = document.getElementById(timerId);
@@ -357,7 +289,7 @@
       update();
     }
     
-    // --- Các hiệu ứng, zones, projectiles ---
+    // --- Các hiệu ứng, zones, projectiles (như cũ, nhưng xử lý cho cả 2 player) ---
     const iceZones = [];
     const thunderZones = [];
     const trails = [];
@@ -399,6 +331,7 @@
     }
     function updateIceZones() {
       const now = Date.now();
+      // Cập nhật cho cả local player và đối thủ
       [player, opponent].forEach(target => {
         if(target) {
           iceZones.forEach((zone, index) => {
@@ -646,7 +579,7 @@
       if(player) { player.stunned = false; player.immobilized = false; }
       if(opponent) { opponent.stunned = false; opponent.immobilized = false; }
     }
-    // --- Lớp Player (cho cả local và opponent) ---
+    // --- Lớp Player (sử dụng cho cả local và opponent) ---
     class Player {
       constructor(x, y, color, controls, side, characterType) {
         this.x = x;
@@ -793,6 +726,7 @@
         let effectiveAttackCooldown = this.baseAttackCooldown;
         this.attackDebuffs = this.attackDebuffs.filter(d => d.expire > Date.now());
         this.attackDebuffs.forEach(d => { effectiveAttackCooldown += d.amount; });
+        
         if(this.characterType === "knight" && this.immune) {
           this.stunned = false;
           this.immobilized = false;
@@ -819,7 +753,7 @@
           this.lastAttackTime = Date.now();
           if(this.characterType === "mage") { showFireballEffect(this); }
           else { showAttackEffect(this); }
-          // Local player luôn sử dụng control của "left"
+          // Giả sử local player luôn là "left"
           startSkillCooldown("left-cooldown", "left-cooldown-timer", 3000);
           setTimeout(() => { this.attacking = false; }, 150);
           if(this.characterType === "knight" && this.buffActive) {
@@ -915,67 +849,11 @@
           triggerSpecialZone("left-special-zone");
         }
       }
+      // Trong chế độ multiplayer, checkCollision được xử lý qua update_game từ server
       checkCollision(opponent) { }
     }
-    // --- Flow: Start -> Class Selection -> Name Input -> Tìm trận ---
-    // Khi nhấn "Bắt đầu", chuyển sang màn hình chọn class
-    document.getElementById("startMenuButton").addEventListener("click", () => {
-      document.getElementById("startScreen").style.display = "none";
-      document.getElementById("characterSelectScreen").style.display = "flex";
-    });
-    // Khi chọn class (chỉ 1 option) và nhấn "Tiếp theo"
-    document.getElementById("confirmCharacterButton").addEventListener("click", () => {
-      // Lấy lựa chọn từ #left-character-select
-      const option = document.querySelector("#left-character-select .character-option.selected");
-      if(option) {
-        selectedCharacterLeft = option.getAttribute("data-character");
-      }
-      document.getElementById("characterSelectScreen").style.display = "none";
-      document.getElementById("nameScreen").style.display = "flex";
-    });
-    // Khi nhấn "Tìm trận" trên màn hình nhập tên
-    document.getElementById("findMatchButton").addEventListener("click", () => {
-      const nameInput = document.getElementById("playerName").value.trim();
-      localName = nameInput || "Player";
-      document.getElementById("nameScreen").style.display = "none";
-      document.getElementById("waitingScreen").style.display = "flex";
-      // Gửi yêu cầu ghép trận đến server
-      socket.emit("find_match", { name: localName, character: selectedCharacterLeft });
-    });
-    
-    // --- Tạo đối tượng khi nhận sự kiện ghép trận từ server ---
-    // Giả sử server gửi: roomId, opponent (object chứa name, character, …) và màu được gán cho local player (color)
-    socket.on("match_found", ({ roomId: rId, opponent: oppData, color }) => {
-      roomId = rId;
-      document.getElementById("waitingScreen").style.display = "none";
-      alert(`🎮 Trận đấu bắt đầu! Đối thủ của bạn: ${oppData.name}`);
-      // Phân màu: nếu local player nhận "blue" thì opponent là "red" và ngược lại.
-      let localColor = color;
-      let oppColor = (color === "blue") ? "red" : "blue";
-      createLocalPlayer(localColor);
-      createOpponentPlayer(oppData, oppColor);
-      gameLoop();
-    });
-    
-    socket.on("opponent_left", () => {
-      alert("❌ Đối thủ đã rời khỏi trận đấu!");
-      location.reload();
-    });
-    
-    // Cập nhật chuyển động từ server (chỉ dùng cho opponent)
-    socket.on("update_game", ({ playerId, key }) => {
-      let target = (playerId === socket.id) ? player : opponent;
-      if (key === "ArrowLeft" || key === "a") target.x -= 5;
-      if (key === "ArrowRight" || key === "d") target.x += 5;
-      if (key === "ArrowUp" || key === "w") target.y -= 5;
-      if (key === "ArrowDown" || key === "s") target.y += 5;
-    });
-    
-    document.getElementById("menuButton").addEventListener("click", () => {
-      location.reload();
-    });
-    
-    // --- Hàm tạo đối tượng ---
+    // --- Các hàm tạo đối tượng player ---
+    // Hàm tạo local player (vị trí mặc định là (50,50)) với màu và nhân vật từ lựa chọn
     function createLocalPlayer(assignedColor) {
       if(selectedCharacterLeft === "archer") {
         player = new Player(50,50, assignedColor, { left:"a", right:"d", up:"w", down:"s", attack:" ", counter:"c", ultimate:"v" }, "left", "archer");
@@ -986,14 +864,16 @@
       }
       player.name = localName;
     }
+    // Hàm tạo opponent (vị trí mặc định là (750,550))
     function createOpponentPlayer(opponentData, oppColor) {
+      // opponentData chứa thông tin như name và character (nếu có)
       let oppChar = opponentData.character || "knight";
       opponent = new Player(750,550, oppColor, { left:"ArrowLeft", right:"ArrowRight", up:"ArrowUp", down:"ArrowDown", attack:"Enter", counter:"/", ultimate:"ShiftRight" }, "right", oppChar);
       opponent.name = opponentData.name;
     }
-    
+    // --- Reset Round & GameLoop ---
     function resetRound() {
-      if(player) {
+      if(player) { 
         player.health = (player.characterType === "archer" || player.characterType === "mage") ? 280 : 300;
         player.x = 50; player.y = 50;
         player.lastUltimateTime = 0;
@@ -1005,13 +885,10 @@
       }
       clearAllEffects();
     }
+    function resetGame() { location.reload(); }
     function gameLoop() {
       ctx.clearRect(0,0,canvas.width,canvas.height);
-      if(player) {
-        // Cập nhật di chuyển của local player dựa trên keys
-        player.move(keys);
-        player.draw();
-      }
+      if(player) player.draw();
       if(opponent) opponent.draw();
       updateEffects();
       updateTrails();
@@ -1021,14 +898,103 @@
       drawProjectiles();
       drawIceZones();
       drawThunderZones();
-      if(player && opponent && (player.health <= 0 || opponent.health <= 0)) {
+      if(player && opponent) {
+        if(player.health <= 0 || opponent.health <= 0) {
           score++;
           updateScoreboard();
           clearAllEffects();
           resetRound();
+        }
       }
       requestAnimationFrame(gameLoop);
     }
+    // --- Hàm kích hoạt Special ---
+    function triggerSpecialZone(zoneId) {
+      let overlayId = "left-special-overlay";
+      let timerId = "left-special-zone-timer";
+      startSkillCooldown(overlayId, timerId, 5000);
+      if(player) {
+        if(player.characterType === "knight") {
+          player.speed = player.baseSpeed * 1.3;
+          player.attack = player.baseAttack * 1.1;
+          player.buffActive = true;
+          player.specialEffect = "knight";
+          setTimeout(() => { 
+              player.buffActive = false; 
+              player.specialEffect = false;
+              player.speed = player.baseSpeed; 
+              player.attack = player.baseAttack;
+          }, 5000);
+        } else if(player.characterType === "archer") {
+          let dash = 200;
+          player.x += dash * Math.cos(player.lastDir);
+          player.y += dash * Math.sin(player.lastDir);
+          player.x = clamp(player.x, player.size, canvas.width - player.size);
+          player.y = clamp(player.y, player.size, canvas.height - player.size);
+        } else if(player.characterType === "mage") {
+          player.waterShieldActive = true;
+          player.waterShieldExpire = Date.now() + 3000;
+          player.phantomHealth = 20;
+          player.specialEffect = "mage";
+          setTimeout(() => { 
+              player.specialEffect = false;
+              player.waterShieldActive = false;
+          }, 3000);
+        }
+      }
+    }
+    // --- Sự kiện chuyển màn hình ---
+    document.getElementById("instructionButton").addEventListener("click", () => {
+      document.getElementById("startScreen").style.display = "none";
+      document.getElementById("instructionScreen").style.display = "flex";
+    });
+    document.getElementById("infoButton").addEventListener("click", () => {
+      document.getElementById("startScreen").style.display = "none";
+      document.getElementById("characterInfoScreen").style.display = "flex";
+    });
+    document.getElementById("backFromInstruction").addEventListener("click", () => {
+      document.getElementById("instructionScreen").style.display = "none";
+      document.getElementById("startScreen").style.display = "flex";
+    });
+    document.getElementById("backFromInfo").addEventListener("click", () => {
+      document.getElementById("characterInfoScreen").style.display = "none";
+      document.getElementById("startScreen").style.display = "flex";
+    });
+    // --- Socket kết nối ---
+    document.getElementById("startMenuButton").addEventListener("click", () => {
+      localName = prompt("Nhập tên của bạn:") || "Player";
+      // Gửi yêu cầu ghép trận, kèm theo tên và lựa chọn nhân vật (selectedCharacterLeft)
+      socket.emit("find_match", { name: localName, character: selectedCharacterLeft });
+      document.getElementById("startScreen").style.display = "none";
+      document.getElementById("waitingScreen").style.display = "flex";
+    });
+    // Khi nhận sự kiện ghép trận thành công từ server,
+    // giả sử server gửi kèm: roomId, opponent (object chứa name, character, ...) và color cho local player
+    socket.on("match_found", ({ roomId, opponent: oppData, color }) => {
+      document.getElementById("waitingScreen").style.display = "none";
+      alert(`🎮 Trận đấu bắt đầu! Đối thủ của bạn: ${oppData.name}`);
+      // Với màu được giao từ server, nếu local player nhận "blue" thì opponent sẽ là "red" và ngược lại.
+      let localColor = color;
+      let oppColor = (color === "blue") ? "red" : "blue";
+      createLocalPlayer(localColor);
+      createOpponentPlayer(oppData, oppColor);
+      gameLoop();
+    });
+    socket.on("opponent_left", () => {
+      alert("❌ Đối thủ đã rời khỏi trận đấu!");
+      location.reload();
+    });
+    // Cập nhật chuyển động của các player dựa trên dữ liệu từ server
+    socket.on("update_game", ({ playerId, key }) => {
+      let target = (playerId === socket.id) ? player : opponent;
+      if (key === "ArrowLeft" || key === "a") target.x -= 5;
+      if (key === "ArrowRight" || key === "d") target.x += 5;
+      if (key === "ArrowUp" || key === "w") target.y -= 5;
+      if (key === "ArrowDown" || key === "s") target.y += 5;
+    });
+    document.getElementById("menuButton").addEventListener("click", () => {
+      location.reload();
+    });
   </script>
 </body>
 </html>
