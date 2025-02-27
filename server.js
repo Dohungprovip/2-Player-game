@@ -12,13 +12,16 @@ const io = new Server(server, {
   },
 });
 
-let waitingPlayers = []; // Danh sách người chơi chờ vào trận
-let rooms = {}; // Lưu thông tin phòng chơi
+app.get("/", (req, res) => {
+  res.send("Server is running!");
+});
+
+let waitingPlayers = [];
+let rooms = {};
 
 io.on("connection", (socket) => {
   console.log(`🔗 Người chơi kết nối: ${socket.id}`);
 
-  // Khi người chơi tìm trận đấu
   socket.on("find_match", (playerData) => {
     waitingPlayers.push({ id: socket.id, ...playerData });
 
@@ -36,12 +39,11 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Khi một người chơi gửi tín hiệu di chuyển
+  // 💡 Chỉ xử lý sự kiện "player_move" bên trong "connection"
   socket.on("player_move", ({ roomId, moveData }) => {
     socket.to(roomId).emit("update_game", moveData);
   });
 
-  // Khi người chơi ngắt kết nối
   socket.on("disconnect", () => {
     console.log(`❌ Người chơi rời khỏi: ${socket.id}`);
     waitingPlayers = waitingPlayers.filter((p) => p.id !== socket.id);
@@ -54,10 +56,7 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(3000, () => {
-  console.log("🚀 Server đang chạy trên cổng 3000");
-});
-
-socket.on("player_move", ({ roomId, playerId, key }) => {
-  io.to(roomId).emit("update_game", { playerId, key });
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`🚀 Server đang chạy trên cổng ${PORT}`);
 });
