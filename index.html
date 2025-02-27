@@ -196,6 +196,31 @@
     .class-btn.active {
       background: linear-gradient(135deg, #777, #aaa);
     }
+    /* Skill slots cho local player */
+    #skillContainer {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 1002;
+    }
+    .skill-slot {
+      position: relative;
+      width: 60px;
+      height: 60px;
+      border: 2px solid #fff;
+      border-radius: 10px;
+      background: #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .skill-icon {
+      font-size: 32px;
+      z-index: 1;
+    }
   </style>
 </head>
 <body>
@@ -268,7 +293,36 @@
     <div class="spinner"></div>
   </div>
   
+  <!-- Canvas game -->
   <canvas id="gameCanvas" width="800" height="600"></canvas>
+  
+  <!-- Skill slots hiển thị ở bên phải (chỉ local player thấy) -->
+  <div id="skillContainer">
+    <div class="skill-slot" id="skill-attack">
+      <div class="skill-icon">⚔️</div>
+      <div class="cooldown-overlay" id="skill-attack-overlay">
+        <div class="cooldown-timer" id="skill-attack-timer"></div>
+      </div>
+    </div>
+    <div class="skill-slot" id="skill-counter">
+      <div class="skill-icon">🛡️</div>
+      <div class="cooldown-overlay" id="skill-counter-overlay">
+        <div class="cooldown-timer" id="skill-counter-timer"></div>
+      </div>
+    </div>
+    <div class="skill-slot" id="skill-special">
+      <div class="skill-icon">⭐</div>
+      <div class="cooldown-overlay" id="skill-special-overlay">
+        <div class="cooldown-timer" id="skill-special-timer"></div>
+      </div>
+    </div>
+    <div class="skill-slot" id="skill-ultimate">
+      <div class="skill-icon">✴</div>
+      <div class="cooldown-overlay" id="skill-ultimate-overlay">
+        <div class="cooldown-timer" id="skill-ultimate-timer"></div>
+      </div>
+    </div>
+  </div>
   
   <script>
     // --- Global Variables ---
@@ -279,17 +333,14 @@
     let roomId;      // lưu roomId nhận từ server
     const socket = io("https://game-cua-dohung.onrender.com");
     
-    // --- Khai báo đối tượng keys để lưu trạng thái phím ---
+    // --- Đối tượng lưu trạng thái phím ---
     let keys = {};
-    // Lắng nghe sự kiện keydown
     document.addEventListener("keydown", (e) => {
       keys[e.key] = true;
-      // Gửi sự kiện cho server nếu cần thiết
       if (socket.connected) {
         socket.emit("player_move", { roomId, playerId: socket.id, key: e.key });
       }
     });
-    // Lắng nghe sự kiện keyup
     document.addEventListener("keyup", (e) => {
       keys[e.key] = false;
     });
@@ -615,7 +666,7 @@
       if(player) { player.stunned = false; player.immobilized = false; }
       if(opponent) { opponent.stunned = false; opponent.immobilized = false; }
     }
-    // --- Lớp Player (sử dụng cho cả local và opponent) ---
+    // --- Lớp Player ---
     class Player {
       constructor(x, y, color, controls, side, characterType) {
         this.x = x;
@@ -758,7 +809,6 @@
         this.drawName();
         if(this.stunned || this.immobilized) { drawStunEffect(this); }
       }
-      // Hàm di chuyển sử dụng trạng thái của đối tượng keys
       move(keys) {
         let effectiveAttackCooldown = this.baseAttackCooldown;
         this.attackDebuffs = this.attackDebuffs.filter(d => d.expire > Date.now());
@@ -784,13 +834,14 @@
                                        (keys[this.controls.right] ? 1 : 0) - (keys[this.controls.left] ? 1 : 0));
           }
         }
+        // Xử lý tấn công (attack)
         if(keys[this.controls.attack] && Date.now() - this.lastAttackTime > ((this.ultimateActive && this.characterType==="archer") ? 0 : effectiveAttackCooldown)) {
           this.attacking = true;
           this.attackProcessed = false;
           this.lastAttackTime = Date.now();
           if(this.characterType === "mage") { showFireballEffect(this); }
           else { showAttackEffect(this); }
-          startSkillCooldown("left-cooldown", "left-cooldown-timer", 3000);
+          startSkillCooldown("skill-attack-overlay", "skill-attack-timer", 3000);
           setTimeout(() => { this.attacking = false; }, 150);
           if(this.characterType === "knight" && this.buffActive) {
             this.speed = this.baseSpeed;
@@ -798,11 +849,12 @@
             this.buffActive = false;
           }
         }
+        // Xử lý counter
         if(keys[this.controls.counter] && Date.now() - this.lastCounterTime > this.counterCooldown) {
           this.countering = true;
           this.lastCounterTime = Date.now();
           showCounterEffect(this);
-          startSkillCooldown("left-counter-cooldown", "left-counter-timer", 3000);
+          startSkillCooldown("skill-counter-overlay", "skill-counter-timer", 3000);
           if(this.characterType === "archer") {
             let bola = {
               type: "bola",
@@ -834,6 +886,7 @@
           }
           setTimeout(() => { this.countering = false; }, 1000);
         }
+        // Xử lý Ultimate
         if(keys[this.controls.ultimate] && Date.now() - this.lastUltimateTime > this.ultimateCooldown) {
           this.lastUltimateTime = Date.now();
           if(this.characterType === "archer") {
@@ -878,11 +931,12 @@
             };
             trails.push(trail);
           }
-          startSkillCooldown("left-ultimate-cooldown", "left-ultimate-timer", 40000);
+          startSkillCooldown("skill-ultimate-overlay", "skill-ultimate-timer", 40000);
         }
+        // Xử lý Special (key "b")
         if(keys["b"] && Date.now() - this.lastSpecialTime >= this.specialCooldown) {
           this.lastSpecialTime = Date.now();
-          triggerSpecialZone("left-special-zone");
+          triggerSpecialZone();
         }
       }
       checkCollision(opponent) { }
@@ -917,11 +971,8 @@
       clearAllEffects();
     }
     function resetGame() { location.reload(); }
-    
-    // --- Vòng lặp game ---
     function gameLoop() {
       ctx.clearRect(0,0,canvas.width,canvas.height);
-      // Gọi hàm di chuyển cho local player dựa trên trạng thái phím
       if(player) {
         player.move(keys);
         player.draw();
@@ -945,11 +996,8 @@
       }
       requestAnimationFrame(gameLoop);
     }
-    
-    function triggerSpecialZone(zoneId) {
-      let overlayId = "left-special-overlay";
-      let timerId = "left-special-zone-timer";
-      startSkillCooldown(overlayId, timerId, 5000);
+    function triggerSpecialZone() {
+      startSkillCooldown("skill-special-overlay", "skill-special-timer", 5000);
       if(player) {
         if(player.characterType === "knight") {
           player.speed = player.baseSpeed * 1.3;
@@ -1034,7 +1082,7 @@
       alert("❌ Đối thủ đã rời khỏi trận đấu!");
       location.reload();
     });
-    // Cập nhật chuyển động từ server (nếu cần)
+    // Cập nhật chuyển động từ server
     socket.on("update_game", ({ playerId, key }) => {
       let target = (playerId === socket.id) ? player : opponent;
       if (key === "ArrowLeft" || key === "a") target.x -= 5;
