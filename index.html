@@ -279,11 +279,19 @@
     let roomId;      // lưu roomId nhận từ server
     const socket = io("https://game-cua-dohung.onrender.com");
     
-    // --- Socket & Key Event ---
+    // --- Khai báo đối tượng keys để lưu trạng thái phím ---
+    let keys = {};
+    // Lắng nghe sự kiện keydown
     document.addEventListener("keydown", (e) => {
+      keys[e.key] = true;
+      // Gửi sự kiện cho server nếu cần thiết
       if (socket.connected) {
         socket.emit("player_move", { roomId, playerId: socket.id, key: e.key });
       }
+    });
+    // Lắng nghe sự kiện keyup
+    document.addEventListener("keyup", (e) => {
+      keys[e.key] = false;
     });
     
     const canvas = document.getElementById("gameCanvas");
@@ -319,7 +327,7 @@
       update();
     }
     
-    // --- Các hiệu ứng, zones, projectiles (như cũ, nhưng xử lý cho cả 2 player) ---
+    // --- Các hiệu ứng, zones, projectiles (như cũ) ---
     const iceZones = [];
     const thunderZones = [];
     const trails = [];
@@ -750,6 +758,7 @@
         this.drawName();
         if(this.stunned || this.immobilized) { drawStunEffect(this); }
       }
+      // Hàm di chuyển sử dụng trạng thái của đối tượng keys
       move(keys) {
         let effectiveAttackCooldown = this.baseAttackCooldown;
         this.attackDebuffs = this.attackDebuffs.filter(d => d.expire > Date.now());
@@ -908,9 +917,15 @@
       clearAllEffects();
     }
     function resetGame() { location.reload(); }
+    
+    // --- Vòng lặp game ---
     function gameLoop() {
       ctx.clearRect(0,0,canvas.width,canvas.height);
-      if(player) player.draw();
+      // Gọi hàm di chuyển cho local player dựa trên trạng thái phím
+      if(player) {
+        player.move(keys);
+        player.draw();
+      }
       if(opponent) opponent.draw();
       updateEffects();
       updateTrails();
@@ -930,6 +945,7 @@
       }
       requestAnimationFrame(gameLoop);
     }
+    
     function triggerSpecialZone(zoneId) {
       let overlayId = "left-special-overlay";
       let timerId = "left-special-zone-timer";
@@ -964,6 +980,7 @@
         }
       }
     }
+    
     // --- Sự kiện chuyển màn hình ---
     document.getElementById("instructionButton").addEventListener("click", () => {
       document.getElementById("startScreen").style.display = "none";
@@ -1017,7 +1034,7 @@
       alert("❌ Đối thủ đã rời khỏi trận đấu!");
       location.reload();
     });
-    // Cập nhật chuyển động từ server
+    // Cập nhật chuyển động từ server (nếu cần)
     socket.on("update_game", ({ playerId, key }) => {
       let target = (playerId === socket.id) ? player : opponent;
       if (key === "ArrowLeft" || key === "a") target.x -= 5;
