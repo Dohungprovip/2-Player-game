@@ -65,7 +65,7 @@
       box-shadow: 0 0 20px rgba(0,0,0,0.7);
       background: #444;
     }
-    /* Game Zones – giữ nguyên vị trí & style */
+    /* Các khu vực trong game */
     .zone, .sword-zone, .u-zone, .special-zone {
       position: absolute;
       width: 80px;
@@ -116,7 +116,7 @@
       opacity: 0;
       transition: height 0.3s ease, opacity 0.3s ease;
     }
-    /* Overlay Screens chung */
+    /* Overlay chung */
     .overlay-screen {
       position: fixed;
       top: 0;
@@ -161,40 +161,34 @@
     #nameScreen, #characterSelectScreen {
       display: none;
     }
-    /* Giao diện ghép trận với spinner */
+    /* Giao diện tìm trận */
     #waitingScreen {
       display: none;
+      flex-direction: column;
     }
-    .spinner {
-      border: 8px solid rgba(255,255,255,0.3);
-      border-top: 8px solid white;
-      border-radius: 50%;
-      width: 60px;
-      height: 60px;
-      animation: spin 1s linear infinite;
-      margin-top: 20px;
+    /* Ready panel trong màn hình tìm trận */
+    #readyPanel {
+      display: none;
+      text-align: center;
     }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+    #readyTimer {
+      font-size: 24px;
+      margin-bottom: 20px;
     }
-    /* Style cho nút chọn class */
-    .class-btn {
-      padding: 10px 20px;
-      margin: 10px;
-      font-size: 18px;
-      cursor: pointer;
-      background: linear-gradient(135deg, #555, #777);
-      border: none;
-      border-radius: 5px;
+    .ready-box {
+      width: 150px;
+      padding: 10px;
+      margin: 10px auto;
+      background-color: gray;
       color: #fff;
-      transition: background 0.3s ease;
+      border-radius: 5px;
     }
-    .class-btn:hover {
-      background: linear-gradient(135deg, #777, #999);
+    .ready-box.ready {
+      background-color: limegreen;
     }
-    .class-btn.active {
-      background: linear-gradient(135deg, #777, #aaa);
+    /* Spinner */
+    .spinner {
+      margin-top: 20px;
     }
     /* Skill slots cho local player */
     #skillContainer {
@@ -287,10 +281,20 @@
     <button id="backFromInfo">Quay lại</button>
   </div>
   
-  <!-- Waiting Screen: giao diện ghép trận với spinner -->
+  <!-- Waiting Screen: giao diện ghép trận với spinner và panel sẵn sàng -->
   <div id="waitingScreen" class="overlay-screen">
-    <h1>Đang tìm trận...</h1>
-    <div class="spinner"></div>
+    <h1>Chờ trận đấu</h1>
+    <!-- Ready Panel hiển thị trạng thái và đồng hồ đếm ngược -->
+    <div id="readyPanel">
+      <div id="readyTimer">30</div>
+      <div id="readyContainer">
+        <div id="localReady" class="ready-box">Bạn: Chưa sẵn sàng</div>
+        <div id="opponentReady" class="ready-box">Đối thủ: Chưa sẵn sàng</div>
+      </div>
+      <button id="readyButton">Sẵn sàng</button>
+    </div>
+    <!-- Spinner ẩn nếu readyPanel được hiển thị -->
+    <div class="spinner" id="waitingSpinner"></div>
   </div>
   
   <!-- Canvas game -->
@@ -333,9 +337,11 @@
     let roomId;      // room id nhận từ server
     const socket = io("https://game-cua-dohung.onrender.com");
     
-    // Biến kiểm soát trạng thái sẵn sàng của cả hai người chơi
-    let playerReady = false;
-    let opponentReady = false;
+    // Biến trạng thái sẵn sàng
+    let localReady = false;
+    let remoteReady = false;
+    let readyCountdown = 30;
+    let readyTimerInterval;
     
     // --- Đối tượng lưu trạng thái phím ---
     let keys = {};
@@ -359,7 +365,7 @@
       return Math.min(Math.max(val, min), max);
     }
     
-    // --- Skill Cooldown --- (hiển thị thời gian hồi chiêu)
+    // --- Skill Cooldown ---
     function startSkillCooldown(overlayId, timerId, duration) {
       const overlay = document.getElementById(overlayId);
       const timerElem = document.getElementById(timerId);
@@ -982,15 +988,55 @@
       createLocalPlayer(localColor);
       createOpponentPlayer(oppData, oppColor);
       
-      // Hiển thị màn hình chờ và prompt xác nhận
-      document.getElementById("waitingScreen").style.display = "flex";
-      if (confirm(`🎮 Đối thủ của bạn: ${oppData.name}. Nhấn OK để bắt đầu.`)) {
+      // Ẩn spinner và hiển thị panel "Sẵn sàng" với đếm ngược 30 giây
+      document.getElementById("waitingSpinner").style.display = "none";
+      document.getElementById("readyPanel").style.display = "block";
+      document.getElementById("readyTimer").textContent = "30";
+      // Reset trạng thái sẵn sàng
+      localReady = false;
+      remoteReady = false;
+      document.getElementById("localReady").classList.remove("ready");
+      document.getElementById("localReady").textContent = "Bạn: Chưa sẵn sàng";
+      document.getElementById("opponentReady").classList.remove("ready");
+      document.getElementById("opponentReady").textContent = "Đối thủ: Chưa sẵn sàng";
+      
+      // Bắt đầu đếm ngược 30s để chọn sẵn sàng
+      readyCountdown = 30;
+      clearInterval(readyTimerInterval);
+      readyTimerInterval = setInterval(() => {
+        readyCountdown--;
+        document.getElementById("readyTimer").textContent = readyCountdown;
+        if(readyCountdown <= 0) {
+          clearInterval(readyTimerInterval);
+          // Nếu hết 30s mà chưa sẵn sàng thì có thể thông báo hoặc hủy ghép trận
+          alert("Hết thời gian sẵn sàng! Vui lòng thử lại.");
+          location.reload();
+        }
+      }, 1000);
+    });
+    
+    // Khi người chơi nhấn nút "Sẵn sàng"
+    document.getElementById("readyButton").addEventListener("click", () => {
+      if (!localReady) {
+        localReady = true;
+        // Cập nhật giao diện: ô của bạn chuyển màu xanh
+        document.getElementById("localReady").classList.add("ready");
+        document.getElementById("localReady").textContent = "Bạn: Sẵn sàng";
+        // Gửi sự kiện "player_ready" đến server
         socket.emit("player_ready", { roomId, playerId: socket.id });
       }
     });
     
-    // Khi server gửi "both_players_ready", ẩn màn hình chờ và bắt đầu trận đấu
+    // Khi nhận được sự kiện "opponent_ready" từ server, cập nhật giao diện
+    socket.on("opponent_ready", () => {
+      remoteReady = true;
+      document.getElementById("opponentReady").classList.add("ready");
+      document.getElementById("opponentReady").textContent = "Đối thủ: Sẵn sàng";
+    });
+    
+    // Khi server gửi "both_players_ready", chuyển giao diện vào trận đấu
     socket.on("both_players_ready", () => {
+      clearInterval(readyTimerInterval);
       document.getElementById("waitingScreen").style.display = "none";
       gameLoop();
     });
@@ -1109,7 +1155,9 @@
       localName = prompt("Nhập tên của bạn:") || "Player";
       socket.emit("find_match", { name: localName, character: selectedCharacterLeft });
       document.getElementById("characterSelectScreen").style.display = "none";
+      // Hiển thị waitingScreen với readyPanel
       document.getElementById("waitingScreen").style.display = "flex";
+      // Trong lúc chờ, hiển thị spinner (readyPanel sẽ được hiển thị sau khi match_found)
     });
     
     socket.on("opponent_left", () => {
