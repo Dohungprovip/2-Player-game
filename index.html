@@ -329,9 +329,13 @@
     let player;      // local player
     let opponent;    // opponent player
     let localName;   // tên người chơi
-    let selectedCharacterLeft = "knight"; // lựa chọn nhân vật của local player (mặc định knight)
-    let roomId;      // lưu roomId nhận từ server
+    let selectedCharacterLeft = "knight"; // mặc định knight
+    let roomId;      // room id nhận từ server
     const socket = io("https://game-cua-dohung.onrender.com");
+    
+    // Biến kiểm soát trạng thái sẵn sàng của cả hai người chơi
+    let playerReady = false;
+    let opponentReady = false;
     
     // --- Đối tượng lưu trạng thái phím ---
     let keys = {};
@@ -355,7 +359,7 @@
       return Math.min(Math.max(val, min), max);
     }
     
-    // --- Skill Cooldown ---
+    // --- Skill Cooldown --- (hiển thị thời gian hồi chiêu)
     function startSkillCooldown(overlayId, timerId, duration) {
       const overlay = document.getElementById(overlayId);
       const timerElem = document.getElementById(timerId);
@@ -364,11 +368,9 @@
       let startTime = Date.now();
       function update() {
         let elapsed = Date.now() - startTime;
-        let progress = elapsed / duration;
         let remaining = Math.ceil((duration - elapsed) / 1000);
         timerElem.textContent = remaining > 0 ? remaining : "";
-        if (progress < 1) {
-          overlay.style.opacity = `${1 - progress}`;
+        if (elapsed < duration) {
           requestAnimationFrame(update);
         } else {
           overlay.style.opacity = "0";
@@ -971,12 +973,56 @@
       clearAllEffects();
     }
     function resetGame() { location.reload(); }
+    
+    // --- Sự kiện liên quan đến xác nhận sẵn sàng của cả hai người chơi ---
+    socket.on("match_found", ({ roomId: rId, opponent: oppData, color }) => {
+      roomId = rId;
+      let localColor = color;
+      let oppColor = (color === "blue") ? "red" : "blue";
+      createLocalPlayer(localColor);
+      createOpponentPlayer(oppData, oppColor);
+      
+      // Hiển thị xác nhận trước khi vào trận
+      if (confirm(`🎮 Đối thủ của bạn: ${oppData.name}. Nhấn OK để bắt đầu.`)) {
+        playerReady = true;
+        socket.emit("player_ready", { roomId });
+      }
+      
+      // Hiển thị màn hình chờ cho đến khi cả hai sẵn sàng
+      document.getElementById("waitingScreen").style.display = "flex";
+    });
+    
+    // Khi cả hai người chơi đã sẵn sàng
+    socket.on("both_players_ready", () => {
+      document.getElementById("waitingScreen").style.display = "none";
+      gameLoop();
+    });
+    
+    // Cập nhật chuyển động của đối thủ
+    socket.on("update_opponent_position", (data) => {
+      if (opponent) {
+        opponent.x = data.x;
+        opponent.y = data.y;
+      }
+    });
+    
+    // Lắng nghe di chuyển của người chơi và gửi lên server
+    function handlePlayerMovement() {
+      if (player) {
+        let prevX = player.x;
+        let prevY = player.y;
+        player.move(keys);
+        if (player.x !== prevX || player.y !== prevY) {
+          socket.emit("player_moved", { roomId, x: player.x, y: player.y });
+        }
+      }
+    }
+    
+    // --- Vòng lặp game ---
     function gameLoop() {
       ctx.clearRect(0,0,canvas.width,canvas.height);
-      if(player) {
-        player.move(keys);
-        player.draw();
-      }
+      handlePlayerMovement();
+      if(player) player.draw();
       if(opponent) opponent.draw();
       updateEffects();
       updateTrails();
@@ -996,6 +1042,7 @@
       }
       requestAnimationFrame(gameLoop);
     }
+    
     function triggerSpecialZone() {
       startSkillCooldown("skill-special-overlay", "skill-special-timer", 5000);
       if(player) {
@@ -1067,22 +1114,11 @@
       document.getElementById("characterSelectScreen").style.display = "none";
       document.getElementById("waitingScreen").style.display = "flex";
     });
-    // Khi server trả về sự kiện ghép trận
-    socket.on("match_found", ({ roomId: rId, opponent: oppData, color }) => {
-      roomId = rId;
-      document.getElementById("waitingScreen").style.display = "none";
-      alert(`🎮 Trận đấu bắt đầu! Đối thủ của bạn: ${oppData.name}`);
-      let localColor = color;
-      let oppColor = (color === "blue") ? "red" : "blue";
-      createLocalPlayer(localColor);
-      createOpponentPlayer(oppData, oppColor);
-      gameLoop();
-    });
+    
     socket.on("opponent_left", () => {
       alert("❌ Đối thủ đã rời khỏi trận đấu!");
       location.reload();
     });
-    // Cập nhật chuyển động từ server
     socket.on("update_game", ({ playerId, key }) => {
       let target = (playerId === socket.id) ? player : opponent;
       if (key === "ArrowLeft" || key === "a") target.x -= 5;
