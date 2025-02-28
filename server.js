@@ -2,14 +2,20 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
+const path = require("path");
 
 const app = express();
 app.use(cors());
-app.use(express.static(__dirname + "/public")); // Phục vụ file tĩnh từ thư mục "public"
+app.use(express.static(path.join(__dirname, "public"))); // Phục vụ file tĩnh từ thư mục "public"
 
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
+});
+
+// Route kiểm tra server có hoạt động không
+app.get("/", (req, res) => {
+  res.send("🚀 Server is running! Use WebSocket to connect.");
 });
 
 // Mảng chờ để ghép trận
@@ -32,23 +38,29 @@ io.on("connection", (socket) => {
       const player2 = waitingPlayers.shift();
       const roomId = `room_${player1.id}_${player2.id}`;
 
-      // Tạo room với trường ready rỗng
+      // Kiểm tra xem cả hai socket có còn kết nối không
+      if (!io.sockets.sockets.get(player1.id) || !io.sockets.sockets.get(player2.id)) {
+        console.log("❌ Một người chơi bị mất kết nối, hủy ghép cặp.");
+        return;
+      }
+
+      // Tạo room với trạng thái ready ban đầu
       rooms[roomId] = { players: [player1, player2], ready: {} };
 
-      // Cho cả 2 socket vào room
+      // Cho cả hai socket vào room
       io.sockets.sockets.get(player1.id).join(roomId);
       io.sockets.sockets.get(player2.id).join(roomId);
 
-      // Gửi thông tin ghép trận cho từng client (phân màu: player1 blue, player2 red)
+      // Gửi thông tin ghép trận cho từng client
       io.to(player1.id).emit("match_found", {
         roomId,
         opponent: { name: player2.name, character: player2.character },
-        color: "blue"
+        color: "blue",
       });
       io.to(player2.id).emit("match_found", {
         roomId,
         opponent: { name: player1.name, character: player1.character },
-        color: "red"
+        color: "red",
       });
 
       console.log(`✅ Ghép cặp: ${player1.id} vs ${player2.id} vào ${roomId}`);
@@ -59,11 +71,12 @@ io.on("connection", (socket) => {
   socket.on("player_ready", (data) => {
     console.log(`player_ready từ ${socket.id} trong room ${data.roomId}`);
     if (rooms[data.roomId]) {
-      // Lưu trạng thái ready của player
       rooms[data.roomId].ready[data.playerId] = true;
-      // Phát thông báo cập nhật trạng thái ready cho toàn room
+
+      // Thông báo cho cả phòng biết player đã sẵn sàng
       io.in(data.roomId).emit("player_ready_update", { playerId: data.playerId });
-      // Nếu đủ 2 người đã sẵn sàng, thông báo bắt đầu trận đấu
+
+      // Nếu cả hai đều sẵn sàng, bắt đầu trận đấu
       if (Object.keys(rooms[data.roomId].ready).length === 2) {
         io.in(data.roomId).emit("both_players_ready");
         console.log(`Room ${data.roomId}: Both players ready. Starting match.`);
@@ -75,6 +88,7 @@ io.on("connection", (socket) => {
   socket.on("player_move", (data) => {
     socket.to(data.roomId).emit("update_game", data);
   });
+
   socket.on("player_moved", (data) => {
     socket.to(data.roomId).emit("update_opponent_position", data);
   });
@@ -83,6 +97,7 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log(`❌ Người chơi rời khỏi: ${socket.id}`);
     waitingPlayers = waitingPlayers.filter((p) => p.id !== socket.id);
+
     for (const roomId in rooms) {
       if (rooms[roomId].players.some((p) => p.id === socket.id)) {
         socket.to(roomId).emit("opponent_left");
@@ -93,6 +108,8 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(3000, () => {
-  console.log("🚀 Server đang chạy trên cổng 3000");
+// Sử dụng PORT của Render hoặc mặc định là 3000
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`🚀 Server đang chạy trên cổng ${PORT}`);
 });
