@@ -3,6 +3,7 @@
 <head>
   <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
   <meta charset="UTF-8" />
+  <!-- Thiết lập viewport cố định -->
   <meta name="viewport" content="width=800" />
   <title>Simple MOBA</title>
   <style>
@@ -158,8 +159,31 @@
     .overlay-screen button:hover {
       background: linear-gradient(135deg, #777, #999);
     }
-    /* Chỉ để lại giao diện Start và ghép trận */
-    /* Xóa giao diện thông tin nhân vật và hướng dẫn */
+    /* Start Screen, Character Select, Name Screen & Waiting Screen */
+    /* Start Screen */
+    #startScreen { display: flex; }
+    /* Các màn hình khác ẩn mặc định */
+    #characterSelectScreen, #nameScreen, #waitingScreen { display: none; }
+    
+    /* Style cho nút chọn Class */
+    .class-btn {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 18px;
+      border: 2px solid #fff;
+      border-radius: 8px;
+      background: #333;
+      color: #fff;
+      transition: transform 0.2s, background 0.2s;
+      cursor: pointer;
+    }
+    .class-btn:hover {
+      transform: scale(1.05);
+      background: #555;
+    }
+    .class-btn.active {
+      background: #777;
+    }
   </style>
 </head>
 <body>
@@ -186,7 +210,14 @@
     <button id="nextButton">Tiếp theo</button>
   </div>
   
-  <!-- Waiting Screen: giao diện ghép trận với spinner và panel sẵn sàng -->
+  <!-- Name Screen (đặt tên) -->
+  <div id="nameScreen" class="overlay-screen">
+    <h1>Nhập tên của bạn</h1>
+    <input type="text" id="nameInput" placeholder="Nhập tên của bạn" />
+    <button id="nameNextButton">Tiếp theo</button>
+  </div>
+  
+  <!-- Waiting Screen: giao diện ghép trận -->
   <div id="waitingScreen" class="overlay-screen">
     <h1>Chờ trận đấu</h1>
     <!-- Ready Panel hiển thị trạng thái và đồng hồ đếm ngược -->
@@ -198,7 +229,6 @@
       </div>
       <button id="readyButton">Sẵn sàng</button>
     </div>
-    <!-- Spinner ẩn nếu readyPanel được hiển thị -->
     <div class="spinner" id="waitingSpinner"></div>
   </div>
   
@@ -266,6 +296,7 @@
     function updateScoreboard() {
       document.getElementById("scoreboard").textContent = `Score: ${score}`;
     }
+    // Hàm clamp đảm bảo nhân vật không vượt ra ngoài biên của canvas
     function clamp(val, min, max) {
       return Math.min(Math.max(val, min), max);
     }
@@ -497,7 +528,7 @@
       projectiles.push(bullet);
     }
     const projectiles = [];
-    // Chỉ kiểm tra va chạm với kẻ địch (target được xác định dựa trên owner của projectile)
+    // Chỉ kiểm tra va chạm với kẻ địch (dựa trên owner của projectile)
     function updateProjectiles() {
       for(let i = projectiles.length - 1; i >= 0; i--) {
         let proj = projectiles[i];
@@ -751,7 +782,7 @@
             this.attackDebuffActive = false;
           }
         }
-        // Sử dụng clamp để đảm bảo nhân vật không vượt quá tường (cạnh canvas)
+        // Giới hạn di chuyển: nhân vật không thể vượt ra ngoài biên của canvas
         if(keys[this.controls.left]) { this.x = Math.max(this.size, this.x - this.speed); }
         if(keys[this.controls.right]) { this.x = Math.min(canvas.width - this.size, this.x + this.speed); }
         if(keys[this.controls.up]) { this.y = Math.max(this.size, this.y - this.speed); }
@@ -906,11 +937,9 @@
       createLocalPlayer(localColor);
       createOpponentPlayer(oppData, oppColor);
       
-      // Ẩn spinner và hiển thị panel "Sẵn sàng" với đếm ngược 30 giây
       document.getElementById("waitingSpinner").style.display = "none";
       document.getElementById("readyPanel").style.display = "block";
       document.getElementById("readyTimer").textContent = "30";
-      // Reset trạng thái sẵn sàng
       localReady = false;
       remoteReady = false;
       document.getElementById("localReady").classList.remove("ready");
@@ -918,7 +947,6 @@
       document.getElementById("opponentReady").classList.remove("ready");
       document.getElementById("opponentReady").textContent = "Đối thủ: Chưa sẵn sàng";
       
-      // Bắt đầu đếm ngược 30s để chọn sẵn sàng
       readyCountdown = 30;
       clearInterval(readyTimerInterval);
       readyTimerInterval = setInterval(() => {
@@ -932,7 +960,6 @@
       }, 1000);
     });
     
-    // Khi người chơi nhấn nút "Sẵn sàng"
     document.getElementById("readyButton").addEventListener("click", () => {
       if (!localReady) {
         localReady = true;
@@ -1034,6 +1061,7 @@
       document.getElementById("startScreen").style.display = "none";
       document.getElementById("characterSelectScreen").style.display = "flex";
     });
+    
     const classButtons = document.querySelectorAll(".class-btn");
     classButtons.forEach(btn => {
       btn.addEventListener("click", () => {
@@ -1042,10 +1070,18 @@
         btn.classList.add("active");
       });
     });
+    
+    // Khi nhấn nút "Tiếp theo" trong giao diện chọn class, chuyển sang Name Screen
     document.getElementById("nextButton").addEventListener("click", () => {
-      localName = prompt("Nhập tên của bạn:") || "Player";
-      socket.emit("find_match", { name: localName, character: selectedCharacterLeft });
       document.getElementById("characterSelectScreen").style.display = "none";
+      document.getElementById("nameScreen").style.display = "flex";
+    });
+    
+    // Khi nhấn nút "Tiếp theo" trên Name Screen, lấy tên và bắt đầu tìm trận
+    document.getElementById("nameNextButton").addEventListener("click", () => {
+      localName = document.getElementById("nameInput").value.trim() || "Player";
+      socket.emit("find_match", { name: localName, character: selectedCharacterLeft });
+      document.getElementById("nameScreen").style.display = "none";
       document.getElementById("waitingScreen").style.display = "flex";
     });
     
