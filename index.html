@@ -974,7 +974,7 @@
     }
     function resetGame() { location.reload(); }
     
-    // --- Sự kiện liên quan đến xác nhận sẵn sàng của cả hai người chơi ---
+    // --- Xác nhận sẵn sàng của cả 2 người chơi ---
     socket.on("match_found", ({ roomId: rId, opponent: oppData, color }) => {
       roomId = rId;
       let localColor = color;
@@ -982,17 +982,14 @@
       createLocalPlayer(localColor);
       createOpponentPlayer(oppData, oppColor);
       
-      // Hiển thị xác nhận trước khi vào trận
-      if (confirm(`🎮 Đối thủ của bạn: ${oppData.name}. Nhấn OK để bắt đầu.`)) {
-        playerReady = true;
-        socket.emit("player_ready", { roomId });
-      }
-      
-      // Hiển thị màn hình chờ cho đến khi cả hai sẵn sàng
+      // Hiển thị màn hình chờ và prompt xác nhận
       document.getElementById("waitingScreen").style.display = "flex";
+      if (confirm(`🎮 Đối thủ của bạn: ${oppData.name}. Nhấn OK để bắt đầu.`)) {
+        socket.emit("player_ready", { roomId, playerId: socket.id });
+      }
     });
     
-    // Khi cả hai người chơi đã sẵn sàng
+    // Khi server gửi "both_players_ready", ẩn màn hình chờ và bắt đầu trận đấu
     socket.on("both_players_ready", () => {
       document.getElementById("waitingScreen").style.display = "none";
       gameLoop();
