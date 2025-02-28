@@ -65,12 +65,11 @@ io.on("connection", (socket) => {
         }
       });
       if (room.players.every(p => p.ready)) {
-        let p1 = room.players[0];
-        let p2 = room.players[1];
         let spawn1, spawn2, color1, color2;
-        if (p1.readyTimestamp <= p2.readyTimestamp) {
-          spawn1 = { x: 50, y: 50 };      // sẵn sàng trước: góc trên bên trái
-          spawn2 = { x: 750, y: 550 };    // sẵn sàng sau: góc dưới bên phải
+        // Phân chia ngẫu nhiên vị trí:
+        if (Math.random() < 0.5) {
+          spawn1 = { x: 50, y: 50 };      // góc trên bên trái
+          spawn2 = { x: 750, y: 550 };     // góc dưới bên phải
           color1 = "blue";
           color2 = "red";
         } else {
@@ -79,6 +78,8 @@ io.on("connection", (socket) => {
           color1 = "red";
           color2 = "blue";
         }
+        let p1 = room.players[0];
+        let p2 = room.players[1];
         room.players.forEach(p => {
           let assignedSpawn, assignedColor, opponentData;
           if (p.id === p1.id) {
