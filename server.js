@@ -6,10 +6,10 @@ const cors = require("cors");
 
 const app = express();
 
-// Phục vụ các file tĩnh (bao gồm index.html)
+// Phục vụ file tĩnh (bao gồm index.html)
 app.use(express.static(path.join(__dirname)));
 
-// Khi truy cập vào "/", gửi file index.html
+// Khi truy cập "/", gửi file index.html
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
@@ -25,10 +25,8 @@ let rooms = {}; // Lưu thông tin phòng chơi
 io.on("connection", (socket) => {
   console.log(`🔗 Người chơi kết nối: ${socket.id}`);
 
-  // Khi người chơi tìm trận đấu
   socket.on("find_match", (playerData) => {
     waitingPlayers.push({ id: socket.id, ...playerData, ready: false, readyTimestamp: null });
-
     if (waitingPlayers.length >= 2) {
       const player1 = waitingPlayers.shift();
       const player2 = waitingPlayers.shift();
@@ -36,13 +34,11 @@ io.on("connection", (socket) => {
       
       rooms[roomId] = { players: [player1, player2] };
 
-      // Cho cả 2 socket join vào room
       const socket1 = io.sockets.sockets.get(player1.id);
       const socket2 = io.sockets.sockets.get(player2.id);
-      if(socket1) socket1.join(roomId);
-      if(socket2) socket2.join(roomId);
+      if (socket1) socket1.join(roomId);
+      if (socket2) socket2.join(roomId);
 
-      // Gửi thông báo tìm được đối thủ
       io.to(player1.id).emit("match_found", { roomId, opponent: player2 });
       io.to(player2.id).emit("match_found", { roomId, opponent: player1 });
 
@@ -50,7 +46,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Xử lý sự kiện sẵn sàng từ người chơi
   socket.on("player_ready", ({ roomId, playerId }) => {
     if (rooms[roomId]) {
       const room = rooms[roomId];
@@ -60,45 +55,58 @@ io.on("connection", (socket) => {
           p.readyTimestamp = Date.now();
         }
       });
-      // Thông báo cho đối thủ rằng đã sẵn sàng
+      // Thông báo cho đối thủ đã sẵn sàng
       room.players.forEach(p => {
         if (p.id !== playerId) {
           io.to(p.id).emit("opponent_ready");
         }
       });
-      // Nếu cả 2 đã sẵn sàng, gửi sự kiện "both_players_ready" (spawn, màu và thông tin đối thủ)
+      // Khi cả 2 đã sẵn sàng, thực hiện chuỗi xử lý sau:
       if (room.players.every(p => p.ready)) {
-        // Sắp xếp theo thời gian sẵn sàng để xác định thứ tự spawn
+        // Sắp xếp theo thời gian sẵn sàng
         room.players.sort((a, b) => a.readyTimestamp - b.readyTimestamp);
-        const spawn1 = { x: 50, y: 50 };      // góc trên bên trái
-        const spawn2 = { x: 750, y: 550 };     // góc dưới bên phải
+        const spawn1 = { x: 50, y: 50 };      // Vị trí góc trên bên trái
+        const spawn2 = { x: 750, y: 550 };     // Vị trí góc dưới bên phải
         const color1 = "blue";
         const color2 = "red";
         let p1 = room.players[0];
         let p2 = room.players[1];
+
+        // Bước 1: Gửi thông báo "match_success" với đếm ngược 5 giây
         room.players.forEach(p => {
-          let assignedSpawn, assignedColor, opponentData;
-          if (p.id === p1.id) {
-            assignedSpawn = spawn1;
-            assignedColor = color1;
-            opponentData = p2;
-          } else {
-            assignedSpawn = spawn2;
-            assignedColor = color2;
-            opponentData = p1;
-          }
-          io.to(p.id).emit("both_players_ready", { roomId, spawn: assignedSpawn, color: assignedColor, opponent: opponentData });
+          io.to(p.id).emit("match_success", { roomId, countdown: 5 });
         });
+
+        // Sau 5 giây, gửi thông báo "load_match" với thông tin spawn và đối thủ
+        setTimeout(() => {
+          room.players.forEach(p => {
+            let assignedSpawn, assignedColor, opponentData;
+            if (p.id === p1.id) {
+              assignedSpawn = spawn1;
+              assignedColor = color1;
+              opponentData = p2;
+            } else {
+              assignedSpawn = spawn2;
+              assignedColor = color2;
+              opponentData = p1;
+            }
+            io.to(p.id).emit("load_match", { roomId, spawn: assignedSpawn, color: assignedColor, opponent: opponentData });
+          });
+          // Sau 10 giây, gửi thông báo "start_game" cho cả 2
+          setTimeout(() => {
+            room.players.forEach(p => {
+              io.to(p.id).emit("start_game");
+            });
+          }, 10000);
+        }, 5000);
       }
     }
   });
 
-  // Khi người chơi gửi tín hiệu di chuyển
   socket.on("player_move", ({ roomId, playerId, key }) => {
     io.to(roomId).emit("update_game", { playerId, key });
   });
 
-  // Khi người chơi ngắt kết nối
   socket.on("disconnect", () => {
     console.log(`❌ Người chơi rời khỏi: ${socket.id}`);
     waitingPlayers = waitingPlayers.filter(p => p.id !== socket.id);
