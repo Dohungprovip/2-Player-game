@@ -46,15 +46,16 @@
     #menuButton:hover {
       background: linear-gradient(135deg, #777, #999);
     }
-    /* Cooldown timer */
+    /* Cooldown timer – tăng kích thước và thêm bóng chữ */
     .cooldown-timer {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      font-size: 20px;
+      font-size: 28px;
       font-weight: bold;
       color: #fff;
+      text-shadow: 2px 2px 4px #000;
       opacity: 1 !important;
     }
     /* Canvas */
@@ -215,6 +216,80 @@
       font-size: 32px;
       z-index: 1;
     }
+    /* Style cho nút chọn Class */
+    .class-btn {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 18px;
+      border: 2px solid #fff;
+      border-radius: 8px;
+      background: #333;
+      color: #fff;
+      transition: transform 0.2s, background 0.2s;
+      cursor: pointer;
+    }
+    .class-btn:hover {
+      transform: scale(1.05);
+      background: #555;
+    }
+    .class-btn.active {
+      background: #777;
+    }
+    /* Cải thiện giao diện thông tin nhân vật */
+    .info-box {
+      padding: 10px;
+      margin: 10px;
+      border: 2px solid #fff;
+      border-radius: 8px;
+      background: #333;
+      transition: transform 0.2s, background 0.2s;
+      cursor: pointer;
+    }
+    .info-box:hover {
+      transform: scale(1.05);
+      background: #555;
+    }
+    .info-row {
+      margin: 5px 0;
+      font-size: 16px;
+    }
+    /* Responsive: hiển thị nút điều khiển trên điện thoại */
+    @media (max-width: 768px) {
+      canvas {
+        width: 100%;
+        height: auto;
+      }
+      #mobileControls {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: space-around;
+        background: rgba(0,0,0,0.7);
+        padding: 10px;
+        z-index: 1003;
+      }
+      #moveControls, #skillControls {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .move-btn, .skill-btn {
+        font-size: 24px;
+        padding: 10px;
+        margin: 5px;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        background: #333;
+        color: #fff;
+        width: 50px;
+        height: 50px;
+      }
+      .move-btn:active, .skill-btn:active {
+        background: #555;
+      }
+    }
   </style>
 </head>
 <body>
@@ -256,7 +331,7 @@
     <button id="backFromInstruction">Quay lại</button>
   </div>
   
-  <!-- Character Info Screen (không thay đổi) -->
+  <!-- Character Info Screen -->
   <div id="characterInfoScreen" class="overlay-screen">
     <h1>Thông tin nhân vật</h1>
     <div id="infoCharacterBoxes">
@@ -325,6 +400,24 @@
       <div class="cooldown-overlay" id="skill-ultimate-overlay">
         <div class="cooldown-timer" id="skill-ultimate-timer"></div>
       </div>
+    </div>
+  </div>
+  
+  <!-- Mobile Controls (chỉ hiển thị trên thiết bị di động) -->
+  <div id="mobileControls">
+    <div id="moveControls">
+      <button class="move-btn" data-key="w">↑</button>
+      <div>
+        <button class="move-btn" data-key="a">←</button>
+        <button class="move-btn" data-key="s">↓</button>
+        <button class="move-btn" data-key="d">→</button>
+      </div>
+    </div>
+    <div id="skillControls">
+      <button class="skill-btn" data-key=" ">⚔️</button>
+      <button class="skill-btn" data-key="c">🛡️</button>
+      <button class="skill-btn" data-key="b">⭐</button>
+      <button class="skill-btn" data-key="v">✴</button>
     </div>
   </div>
   
@@ -615,7 +708,19 @@
             damage *= 1.5;
           }
           if(proj.type === "bullet" || proj.type === "fireball") {
-            player.health = Math.max(0, player.health - damage);
+            // Trừ sát thương từ "máu ảo" nếu có, ưu tiên trừ máu ảo trước
+            if('phantomHealth' in player && player.phantomHealth > 0 && Date.now() < player.phantomExpire) {
+              if(damage <= player.phantomHealth) {
+                player.phantomHealth -= damage;
+                damage = 0;
+              } else {
+                damage -= player.phantomHealth;
+                player.phantomHealth = 0;
+              }
+            }
+            if(damage > 0) {
+              player.health = Math.max(0, player.health - damage);
+            }
           } else if(proj.type === "bola") {
             player.stunned = true;
             player.stunStart = Date.now();
@@ -1008,7 +1113,7 @@
         document.getElementById("readyTimer").textContent = readyCountdown;
         if(readyCountdown <= 0) {
           clearInterval(readyTimerInterval);
-          // Nếu hết 30s mà chưa sẵn sàng thì có thể thông báo hoặc hủy ghép trận
+          // Nếu hết 30s mà chưa sẵn sàng thì thông báo và tải lại trang
           alert("Hết thời gian sẵn sàng! Vui lòng thử lại.");
           location.reload();
         }
@@ -1157,7 +1262,6 @@
       document.getElementById("characterSelectScreen").style.display = "none";
       // Hiển thị waitingScreen với readyPanel
       document.getElementById("waitingScreen").style.display = "flex";
-      // Trong lúc chờ, hiển thị spinner (readyPanel sẽ được hiển thị sau khi match_found)
     });
     
     socket.on("opponent_left", () => {
@@ -1173,6 +1277,23 @@
     });
     document.getElementById("menuButton").addEventListener("click", () => {
       location.reload();
+    });
+    
+    // --- Mobile Controls: xử lý sự kiện touch ---
+    document.querySelectorAll(".move-btn, .skill-btn").forEach(btn => {
+      btn.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        let key = btn.getAttribute("data-key");
+        keys[key] = true;
+        if (socket.connected) {
+          socket.emit("player_move", { roomId, playerId: socket.id, key: key });
+        }
+      });
+      btn.addEventListener("touchend", (e) => {
+        e.preventDefault();
+        let key = btn.getAttribute("data-key");
+        keys[key] = false;
+      });
     });
   </script>
 </body>
