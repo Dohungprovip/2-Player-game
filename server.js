@@ -9,7 +9,7 @@ const app = express();
 // Phục vụ các file tĩnh (bao gồm index.html)
 app.use(express.static(path.join(__dirname)));
 
-// Khi truy cập "/", gửi index.html
+// Khi truy cập vào "/", gửi file index.html
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
@@ -25,20 +25,31 @@ let rooms = {}; // Lưu thông tin phòng chơi
 io.on("connection", (socket) => {
   console.log(`🔗 Người chơi kết nối: ${socket.id}`);
 
+  // Khi người chơi tìm trận đấu
   socket.on("find_match", (playerData) => {
     waitingPlayers.push({ id: socket.id, ...playerData, ready: false, readyTimestamp: null });
+
     if (waitingPlayers.length >= 2) {
       const player1 = waitingPlayers.shift();
       const player2 = waitingPlayers.shift();
       const roomId = `room_${player1.id}_${player2.id}`;
+      
       rooms[roomId] = { players: [player1, player2] };
-      socket.join(roomId);
+
+      // Cho cả 2 socket join vào room
+      const socket1 = io.sockets.sockets.get(player1.id);
+      const socket2 = io.sockets.sockets.get(player2.id);
+      if(socket1) socket1.join(roomId);
+      if(socket2) socket2.join(roomId);
+
       io.to(player1.id).emit("match_found", { roomId, opponent: player2 });
       io.to(player2.id).emit("match_found", { roomId, opponent: player1 });
+
       console.log(`✅ Ghép cặp: ${player1.id} vs ${player2.id} vào ${roomId}`);
     }
   });
 
+  // Xử lý sự kiện sẵn sàng từ người chơi
   socket.on("player_ready", ({ roomId, playerId }) => {
     if (rooms[roomId]) {
       const room = rooms[roomId];
@@ -85,10 +96,12 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Khi người chơi gửi tín hiệu di chuyển
   socket.on("player_move", ({ roomId, playerId, key }) => {
     io.to(roomId).emit("update_game", { playerId, key });
   });
 
+  // Khi người chơi ngắt kết nối
   socket.on("disconnect", () => {
     console.log(`❌ Người chơi rời khỏi: ${socket.id}`);
     waitingPlayers = waitingPlayers.filter(p => p.id !== socket.id);
