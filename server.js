@@ -4,6 +4,11 @@ const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 
+app.get("/", (req, res) => {
+  res.send("🚀 Server is running! Use WebSocket to connect.");
+});
+
+
 const app = express();
 app.use(cors());
 app.use(express.static(__dirname + '/public')); // Phục vụ các file tĩnh từ thư mục public
