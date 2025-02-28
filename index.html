@@ -14,7 +14,7 @@
       background: linear-gradient(135deg, #1e1e1e, #444);
       color: #fff;
     }
-    /* Scoreboard – hiển thị điểm chung */
+    /* Scoreboard */
     #scoreboard {
       position: fixed;
       top: 10px;
@@ -65,7 +65,7 @@
       box-shadow: 0 0 20px rgba(0,0,0,0.7);
       background: #444;
     }
-    /* Các khu vực trong game (giữ nguyên) */
+    /* Các khu vực trong game */
     .zone, .sword-zone, .u-zone, .special-zone {
       position: absolute;
       width: 80px;
@@ -157,7 +157,7 @@
     .overlay-screen button:hover {
       background: linear-gradient(135deg, #777, #999);
     }
-    /* Giao diện chọn class cho local player */
+    /* Giao diện chọn class */
     #characterSelectScreen {
       display: none;
       flex-direction: column;
@@ -187,7 +187,7 @@
     .class-btn.active {
       border-color: gold;
     }
-    /* Giao diện nhập tên cho local player */
+    /* Giao diện nhập tên */
     #nameScreen {
       display: none;
       flex-direction: column;
@@ -198,7 +198,7 @@
       display: flex;
       gap: 20px;
     }
-    /* Giao diện chờ trận đấu với ready panel */
+    /* Giao diện chờ trận với panel sẵn sàng */
     #waitingScreen {
       display: none;
       flex-direction: column;
@@ -288,7 +288,7 @@
     <button id="findMatchButton">Tìm trận</button>
   </div>
   
-  <!-- Waiting Screen: hiển thị panel sẵn sàng -->
+  <!-- Waiting Screen: Panel sẵn sàng -->
   <div id="waitingScreen" class="overlay-screen">
     <h1>Chờ trận đấu</h1>
     <div id="readyPanel">
@@ -302,10 +302,10 @@
     <div class="spinner" id="waitingSpinner"></div>
   </div>
   
-  <!-- Canvas game -->
+  <!-- Canvas Game -->
   <canvas id="gameCanvas" width="800" height="600"></canvas>
   
-  <!-- Skill slots cho local player -->
+  <!-- Skill Slots cho Local Player -->
   <div id="skillContainer">
     <div class="skill-slot" id="skill-attack">
       <div class="skill-icon">⚔️</div>
@@ -382,7 +382,7 @@
       update();
     }
     
-    // --- Các hiệu ứng, zones, projectiles (giữ nguyên phần lớn) ---
+    // --- Các hiệu ứng, zones, projectiles ---
     const iceZones = [];
     const thunderZones = [];
     const trails = [];
@@ -596,27 +596,24 @@
         proj.x += dx;
         proj.y += dy;
         proj.traveled += Math.sqrt(dx*dx + dy*dy);
-        let dist = Math.hypot(proj.x - player.x, proj.y - player.y);
-        if(dist < player.size) {
-          if(Date.now() < player.dodgeEnd || Math.random() < player.dodgeChance) {
-            player.dodging = true;
-            player.dodgeEnd = Date.now() + 500;
-            player.effectImmunityEnd = Date.now() + 750;
-            player.stunned = false;
+        // Xác định mục tiêu: nếu proj.owner khớp với local player's side thì mục tiêu là đối thủ, ngược lại là local player.
+        let target = (proj.owner === player.side) ? opponent : player;
+        if(!target) continue;
+        let dist = Math.hypot(proj.x - target.x, proj.y - target.y);
+        if(dist < target.size) {
+          if(Date.now() < target.dodgeEnd || Math.random() < target.dodgeChance) {
+            target.dodging = true;
+            target.dodgeEnd = Date.now() + 500;
+            target.effectImmunityEnd = Date.now() + 750;
+            target.stunned = false;
             projectiles.splice(i, 1);
             continue;
           }
           let damage = proj.damage;
-          if((proj.type === "bullet" || proj.type === "fireball") && Math.random() < player.critChance) {
+          if((proj.type === "bullet" || proj.type === "fireball") && Math.random() < target.critChance) {
             damage *= 1.5;
           }
-          if(proj.type === "bullet" || proj.type === "fireball") {
-            player.health = Math.max(0, player.health - damage);
-          } else if(proj.type === "bola") {
-            player.stunned = true;
-            player.stunStart = Date.now();
-            setTimeout(() => { player.stunned = false; player.stunStart = null; }, proj.stunDuration);
-          }
+          target.health = Math.max(0, target.health - damage);
           projectiles.splice(i, 1);
           continue;
         }
@@ -651,14 +648,14 @@
         ctx.restore();
       });
     }
-    function drawStunEffect(player) {
+    function drawStunEffect(target) {
       let time = Date.now();
       let alpha = 0.5 + 0.5 * Math.sin(time/200);
       ctx.save();
       ctx.font = "24px Arial";
       ctx.fillStyle = `rgba(255,255,0,${alpha})`;
       ctx.textAlign = "center";
-      ctx.fillText("⛓️", player.x, player.y - player.size - 10);
+      ctx.fillText("⛓️", target.x, target.y - target.size - 10);
       ctx.restore();
     }
     function clearAllEffects() {
@@ -949,13 +946,18 @@
       document.getElementById("characterSelectScreen").style.display = "flex";
     });
     
+    // Lắng nghe chọn class
+    const classButtons = document.querySelectorAll(".class-btn");
+    classButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        selectedCharacterLeft = btn.getAttribute("data-class");
+        classButtons.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+      });
+    });
+    
     // Khi nhấn "Tiếp theo" ở màn hình chọn class
     document.getElementById("nextButton").addEventListener("click", () => {
-      // Lấy lựa chọn từ nút class
-      const activeBtn = document.querySelector(".class-btn.active");
-      if(activeBtn) {
-        selectedCharacterLeft = activeBtn.getAttribute("data-class");
-      }
       document.getElementById("characterSelectScreen").style.display = "none";
       document.getElementById("nameScreen").style.display = "flex";
     });
@@ -968,7 +970,7 @@
       document.getElementById("waitingScreen").style.display = "flex";
     });
     
-    // Khi người chơi nhấn nút "Sẵn sàng" trong ready panel
+    // Khi nhấn "Sẵn sàng" trong panel ready
     document.getElementById("readyButton").addEventListener("click", () => {
       if (!localReady) {
         localReady = true;
@@ -978,21 +980,18 @@
       }
     });
     
-    // --- Xử lý các sự kiện từ server ---
     socket.on("opponent_ready", () => {
       remoteReady = true;
       document.getElementById("opponentReady").classList.add("ready");
       document.getElementById("opponentReady").textContent = "Đối thủ: Sẵn sàng";
     });
     
-    // Khi cả 2 người chơi sẵn sàng, server gửi "both_players_ready" kèm spawn và màu
+    // Khi cả 2 người chơi sẵn sàng, server gửi thông tin spawn, màu và đối thủ
     socket.on("both_players_ready", (data) => {
       roomId = data.roomId;
-      // data.spawn là spawn của local player, nên ta tính spawn của đối thủ ngược lại:
       let localSpawn = data.spawn;
       let localColor = data.color;
       let opponentSpawn = (localSpawn.x === 50) ? {x:750, y:550} : {x:50, y:50};
-      // Ẩn ready panel, chuyển vào trận đấu
       clearInterval(readyTimerInterval);
       document.getElementById("waitingScreen").style.display = "none";
       createLocalPlayerWithSpawn(localSpawn, localColor);
@@ -1037,7 +1036,6 @@
     function resetRound() {
       if(player) {
         player.health = (player.characterType === "archer" || player.characterType === "mage") ? 280 : 300;
-        // Spawn lại local player theo spawn ban đầu (giả sử top-left)
         player.x = 50; player.y = 50;
         player.lastUltimateTime = 0;
       }
@@ -1048,6 +1046,7 @@
       }
       clearAllEffects();
     }
+    
     function gameLoop() {
       ctx.clearRect(0,0,canvas.width,canvas.height);
       if(player) {
@@ -1064,12 +1063,48 @@
       drawIceZones();
       drawThunderZones();
       if(player && opponent && (player.health <= 0 || opponent.health <= 0)) {
-          score++;
-          updateScoreboard();
-          clearAllEffects();
-          resetRound();
+        score++;
+        updateScoreboard();
+        clearAllEffects();
+        resetRound();
       }
       requestAnimationFrame(gameLoop);
+    }
+    
+    // --- Sửa hàm updateProjectiles để kiểm tra va chạm giữa 2 player ---
+    function updateProjectiles() {
+      for(let i = projectiles.length - 1; i >= 0; i--) {
+        let proj = projectiles[i];
+        let dx = proj.speed * Math.cos(proj.dir);
+        let dy = proj.speed * Math.sin(proj.dir);
+        proj.x += dx;
+        proj.y += dy;
+        proj.traveled += Math.sqrt(dx*dx + dy*dy);
+        // Nếu projectile của local player thì mục tiêu là opponent, ngược lại là local player
+        let target = (proj.owner === player.side) ? opponent : player;
+        if(!target) continue;
+        let dist = Math.hypot(proj.x - target.x, proj.y - target.y);
+        if(dist < target.size) {
+          if(Date.now() < target.dodgeEnd || Math.random() < target.dodgeChance) {
+            target.dodging = true;
+            target.dodgeEnd = Date.now() + 500;
+            target.effectImmunityEnd = Date.now() + 750;
+            target.stunned = false;
+            projectiles.splice(i, 1);
+            continue;
+          }
+          let damage = proj.damage;
+          if((proj.type === "bullet" || proj.type === "fireball") && Math.random() < target.critChance) {
+            damage *= 1.5;
+          }
+          target.health = Math.max(0, target.health - damage);
+          projectiles.splice(i, 1);
+          continue;
+        }
+        if(proj.traveled >= proj.maxDistance) {
+          projectiles.splice(i, 1);
+        }
+      }
     }
     
     function triggerSpecialZone() {
@@ -1104,7 +1139,6 @@
         }
       }
     }
-    
   </script>
 </body>
 </html>
