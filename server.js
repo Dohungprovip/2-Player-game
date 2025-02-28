@@ -65,6 +65,8 @@ io.on("connection", (socket) => {
         }
       });
       if (room.players.every(p => p.ready)) {
+        // --- Thêm đoạn sắp xếp theo readyTimestamp để xác định thứ tự xuất hiện ---
+        room.players.sort((a, b) => a.readyTimestamp - b.readyTimestamp);
         // Không còn spawn ngẫu nhiên nữa: xác định cố định vị trí và màu cho các người chơi.
         const spawn1 = { x: 50, y: 50 };      // góc trên bên trái
         const spawn2 = { x: 750, y: 550 };     // góc dưới bên phải
