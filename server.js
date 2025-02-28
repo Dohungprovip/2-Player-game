@@ -42,6 +42,7 @@ io.on("connection", (socket) => {
       if(socket1) socket1.join(roomId);
       if(socket2) socket2.join(roomId);
 
+      // Gửi thông báo tìm được đối thủ
       io.to(player1.id).emit("match_found", { roomId, opponent: player2 });
       io.to(player2.id).emit("match_found", { roomId, opponent: player1 });
 
@@ -59,15 +60,16 @@ io.on("connection", (socket) => {
           p.readyTimestamp = Date.now();
         }
       });
+      // Thông báo cho đối thủ rằng đã sẵn sàng
       room.players.forEach(p => {
         if (p.id !== playerId) {
           io.to(p.id).emit("opponent_ready");
         }
       });
+      // Nếu cả 2 đã sẵn sàng, gửi sự kiện "both_players_ready" (spawn, màu và thông tin đối thủ)
       if (room.players.every(p => p.ready)) {
-        // --- Thêm đoạn sắp xếp theo readyTimestamp để xác định thứ tự xuất hiện ---
+        // Sắp xếp theo thời gian sẵn sàng để xác định thứ tự spawn
         room.players.sort((a, b) => a.readyTimestamp - b.readyTimestamp);
-        // Không còn spawn ngẫu nhiên nữa: xác định cố định vị trí và màu cho các người chơi.
         const spawn1 = { x: 50, y: 50 };      // góc trên bên trái
         const spawn2 = { x: 750, y: 550 };     // góc dưới bên phải
         const color1 = "blue";
