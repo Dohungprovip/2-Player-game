@@ -65,19 +65,11 @@ io.on("connection", (socket) => {
         }
       });
       if (room.players.every(p => p.ready)) {
-        let spawn1, spawn2, color1, color2;
-        // Phân chia ngẫu nhiên vị trí:
-        if (Math.random() < 0.5) {
-          spawn1 = { x: 50, y: 50 };      // góc trên bên trái
-          spawn2 = { x: 750, y: 550 };     // góc dưới bên phải
-          color1 = "blue";
-          color2 = "red";
-        } else {
-          spawn1 = { x: 750, y: 550 };
-          spawn2 = { x: 50, y: 50 };
-          color1 = "red";
-          color2 = "blue";
-        }
+        // Không còn spawn ngẫu nhiên nữa: xác định cố định vị trí và màu cho các người chơi.
+        const spawn1 = { x: 50, y: 50 };      // góc trên bên trái
+        const spawn2 = { x: 750, y: 550 };     // góc dưới bên phải
+        const color1 = "blue";
+        const color2 = "red";
         let p1 = room.players[0];
         let p2 = room.players[1];
         room.players.forEach(p => {
