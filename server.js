@@ -8,13 +8,13 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Cấu hình để phục vụ file tĩnh (client HTML, JS, CSS)
+// Phục vụ file tĩnh từ thư mục "public"
 app.use(express.static(__dirname + '/public'));
 
 // Mảng chờ để ghép trận
 let waitingPlayers = [];
 
-// Object lưu thông tin phòng: roomId -> { players: [socketId1, socketId2], ready: {} }
+// Object lưu thông tin các phòng: roomId -> { players: [socketId1, socketId2], ready: {} }
 let rooms = {};
 
 io.on('connection', (socket) => {
@@ -22,8 +22,7 @@ io.on('connection', (socket) => {
 
   // Khi nhận sự kiện "find_match" từ client
   socket.on('find_match', (data) => {
-    console.log(`find_match từ ${socket.id}:`, data);
-    // Lưu thông tin của client đang tìm trận
+    console.log(`find_match from ${socket.id}:`, data);
     waitingPlayers.push({ socket, data });
     
     // Nếu có đủ 2 người, ghép trận
@@ -31,17 +30,13 @@ io.on('connection', (socket) => {
       const player1 = waitingPlayers.shift();
       const player2 = waitingPlayers.shift();
       
-      // Tạo roomId dựa trên socket id của 2 người
       const roomId = `room-${player1.socket.id}-${player2.socket.id}`;
-      
-      // Cho cả 2 socket vào cùng một room
       player1.socket.join(roomId);
       player2.socket.join(roomId);
       
-      // Lưu thông tin phòng
       rooms[roomId] = {
         players: [player1.socket.id, player2.socket.id],
-        ready: {}  // sẽ chứa các playerId đã sẵn sàng
+        ready: {} // sẽ lưu các playerId đã gửi "player_ready"
       };
       
       // Phân màu: player1 nhận blue, player2 nhận red
@@ -56,42 +51,38 @@ io.on('connection', (socket) => {
         color: 'red'
       });
       
-      console.log(`Ghép trận thành công trong room ${roomId}`);
+      console.log(`Matched room ${roomId}`);
     }
   });
   
   // Khi nhận sự kiện "player_ready" từ client
   socket.on('player_ready', (data) => {
-    console.log(`player_ready từ ${socket.id} trong room ${data.roomId}`);
+    console.log(`player_ready from ${socket.id} in room ${data.roomId}`);
     if (rooms[data.roomId]) {
+      // Lưu trạng thái ready của player
       rooms[data.roomId].ready[data.playerId] = true;
-      // Gửi thông báo đến phòng rằng một đối thủ đã sẵn sàng
-      socket.to(data.roomId).emit('opponent_ready');
+      // Phát sự kiện cho toàn bộ room về trạng thái ready của player này
+      io.in(data.roomId).emit('player_ready_update', { playerId: data.playerId });
       
-      // Nếu đủ 2 người sẵn sàng, gửi thông báo "both_players_ready" đến toàn bộ room
+      // Nếu đủ 2 người đã sẵn sàng, phát thông báo bắt đầu trận đấu
       if (Object.keys(rooms[data.roomId].ready).length === 2) {
         io.in(data.roomId).emit('both_players_ready');
-        console.log(`Room ${data.roomId} đã đủ 2 người sẵn sàng, bắt đầu trận đấu.`);
+        console.log(`Room ${data.roomId}: Both players ready. Starting match.`);
       }
     }
   });
   
-  // Sự kiện di chuyển: "player_move" (có thể dùng cho các hiệu ứng nhấn phím)
+  // Sự kiện di chuyển (ví dụ "player_move" hoặc "player_moved")
   socket.on('player_move', (data) => {
-    // Phát đến tất cả các client trong room ngoại trừ người gửi
     socket.to(data.roomId).emit('update_game', data);
   });
-  
-  // Sự kiện cập nhật vị trí: "player_moved"
   socket.on('player_moved', (data) => {
-    // Gửi thông tin vị trí đến đối thủ trong cùng room
     socket.to(data.roomId).emit('update_opponent_position', data);
   });
   
-  // Xử lý khi một client ngắt kết nối
+  // Khi một client ngắt kết nối, thông báo cho đối thủ và xóa phòng liên quan
   socket.on('disconnect', () => {
     console.log(`Client disconnected: ${socket.id}`);
-    // Kiểm tra nếu socket nằm trong một room, thông báo cho đối thủ
     for (let roomId in rooms) {
       if (rooms[roomId].players.includes(socket.id)) {
         socket.to(roomId).emit('opponent_left');
@@ -99,7 +90,6 @@ io.on('connection', (socket) => {
         break;
       }
     }
-    // Loại bỏ socket khỏi mảng chờ nếu chưa được ghép trận
     waitingPlayers = waitingPlayers.filter(p => p.socket.id !== socket.id);
   });
 });
