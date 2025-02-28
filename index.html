@@ -3,7 +3,7 @@
 <head>
   <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=800" />
   <title>Simple MOBA</title>
   <style>
     /* Tổng thể */
@@ -158,138 +158,8 @@
     .overlay-screen button:hover {
       background: linear-gradient(135deg, #777, #999);
     }
-    /* Ẩn giao diện nhập tên, chọn nhân vật */
-    #nameScreen, #characterSelectScreen {
-      display: none;
-    }
-    /* Giao diện tìm trận */
-    #waitingScreen {
-      display: none;
-      flex-direction: column;
-    }
-    /* Ready panel trong màn hình tìm trận */
-    #readyPanel {
-      display: none;
-      text-align: center;
-    }
-    #readyTimer {
-      font-size: 24px;
-      margin-bottom: 20px;
-    }
-    .ready-box {
-      width: 150px;
-      padding: 10px;
-      margin: 10px auto;
-      background-color: gray;
-      color: #fff;
-      border-radius: 5px;
-    }
-    .ready-box.ready {
-      background-color: limegreen;
-    }
-    /* Spinner */
-    .spinner {
-      margin-top: 20px;
-    }
-    /* Skill slots cho local player */
-    #skillContainer {
-      position: fixed;
-      right: 20px;
-      bottom: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      z-index: 1002;
-    }
-    .skill-slot {
-      position: relative;
-      width: 60px;
-      height: 60px;
-      border: 2px solid #fff;
-      border-radius: 10px;
-      background: #333;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .skill-icon {
-      font-size: 32px;
-      z-index: 1;
-    }
-    /* Style cho nút chọn Class */
-    .class-btn {
-      padding: 10px 20px;
-      margin: 10px;
-      font-size: 18px;
-      border: 2px solid #fff;
-      border-radius: 8px;
-      background: #333;
-      color: #fff;
-      transition: transform 0.2s, background 0.2s;
-      cursor: pointer;
-    }
-    .class-btn:hover {
-      transform: scale(1.05);
-      background: #555;
-    }
-    .class-btn.active {
-      background: #777;
-    }
-    /* Cải thiện giao diện thông tin nhân vật */
-    .info-box {
-      padding: 10px;
-      margin: 10px;
-      border: 2px solid #fff;
-      border-radius: 8px;
-      background: #333;
-      transition: transform 0.2s, background 0.2s;
-      cursor: pointer;
-    }
-    .info-box:hover {
-      transform: scale(1.05);
-      background: #555;
-    }
-    .info-row {
-      margin: 5px 0;
-      font-size: 16px;
-    }
-    /* Responsive: hiển thị nút điều khiển trên điện thoại */
-    @media (max-width: 768px) {
-      canvas {
-        width: 100%;
-        height: auto;
-      }
-      #mobileControls {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        display: flex;
-        justify-content: space-around;
-        background: rgba(0,0,0,0.7);
-        padding: 10px;
-        z-index: 1003;
-      }
-      #moveControls, #skillControls {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-      }
-      .move-btn, .skill-btn {
-        font-size: 24px;
-        padding: 10px;
-        margin: 5px;
-        border: 2px solid #fff;
-        border-radius: 50%;
-        background: #333;
-        color: #fff;
-        width: 50px;
-        height: 50px;
-      }
-      .move-btn:active, .skill-btn:active {
-        background: #555;
-      }
-    }
+    /* Chỉ để lại giao diện Start và ghép trận */
+    /* Xóa giao diện thông tin nhân vật và hướng dẫn */
   </style>
 </head>
 <body>
@@ -302,8 +172,6 @@
     <h1>Simple MOBA</h1>
     <div class="menu">
       <button id="startMenuButton">Bắt đầu</button>
-      <button id="instructionButton">Hướng dẫn</button>
-      <button id="infoButton">Thông tin nhân vật</button>
     </div>
   </div>
   
@@ -316,44 +184,6 @@
       <button class="class-btn" data-class="mage">Mage</button>
     </div>
     <button id="nextButton">Tiếp theo</button>
-  </div>
-  
-  <!-- Instruction Screen (không thay đổi) -->
-  <div id="instructionScreen" class="overlay-screen">
-    <h1>Hướng dẫn</h1>
-    <p>
-      Di chuyển: sử dụng WASD cho local player, mũi tên cho đối thủ<br>
-      Đánh thường: Space (local) – Enter (đối thủ)<br>
-      Skill 1: C (local) – / (đối thủ)<br>
-      Skill 2: B (local) – ' (đối thủ)<br>
-      Ultimate: V (local) – ShiftRight (đối thủ)
-    </p>
-    <button id="backFromInstruction">Quay lại</button>
-  </div>
-  
-  <!-- Character Info Screen -->
-  <div id="characterInfoScreen" class="overlay-screen">
-    <h1>Thông tin nhân vật</h1>
-    <div id="infoCharacterBoxes">
-      <div class="info-box" data-type="knight">Knight</div>
-      <div class="info-box" data-type="archer">Archer</div>
-      <div class="info-box" data-type="mage">Mage</div>
-    </div>
-    <div id="infoRows">
-      <div class="info-row"><span>Chỉ số cơ bản:</span><span id="infoRow1">HP: 300/280, ATK: 25/30, Tốc độ: 2</span></div>
-      <div class="info-row"><span>Skill 1:</span><span id="infoRow2">
-        Knight: phản đòn tồn tại 1s<br>
-        Archer: trói chân 2s<br>
-        Mage: gây sát thương 5/s và trói chân 2s
-      </span></div>
-      <div class="info-row"><span>Skill 2:</span><span id="infoRow3">
-        Mage: khiên nước tồn tại 3s
-      </span></div>
-      <div class="info-row"><span>Ultimate:</span><span id="infoRow4">
-        Mage: gây 50% ATK/s và choáng 1s mỗi 2s (10s)
-      </span></div>
-    </div>
-    <button id="backFromInfo">Quay lại</button>
   </div>
   
   <!-- Waiting Screen: giao diện ghép trận với spinner và panel sẵn sàng -->
@@ -375,7 +205,7 @@
   <!-- Canvas game -->
   <canvas id="gameCanvas" width="800" height="600"></canvas>
   
-  <!-- Skill slots hiển thị ở bên phải (chỉ local player thấy) -->
+  <!-- Skill slots cho local player -->
   <div id="skillContainer">
     <div class="skill-slot" id="skill-attack">
       <div class="skill-icon">⚔️</div>
@@ -400,24 +230,6 @@
       <div class="cooldown-overlay" id="skill-ultimate-overlay">
         <div class="cooldown-timer" id="skill-ultimate-timer"></div>
       </div>
-    </div>
-  </div>
-  
-  <!-- Mobile Controls (chỉ hiển thị trên thiết bị di động) -->
-  <div id="mobileControls">
-    <div id="moveControls">
-      <button class="move-btn" data-key="w">↑</button>
-      <div>
-        <button class="move-btn" data-key="a">←</button>
-        <button class="move-btn" data-key="s">↓</button>
-        <button class="move-btn" data-key="d">→</button>
-      </div>
-    </div>
-    <div id="skillControls">
-      <button class="skill-btn" data-key=" ">⚔️</button>
-      <button class="skill-btn" data-key="c">🛡️</button>
-      <button class="skill-btn" data-key="b">⭐</button>
-      <button class="skill-btn" data-key="v">✴</button>
     </div>
   </div>
   
@@ -685,6 +497,7 @@
       projectiles.push(bullet);
     }
     const projectiles = [];
+    // Chỉ kiểm tra va chạm với kẻ địch (target được xác định dựa trên owner của projectile)
     function updateProjectiles() {
       for(let i = projectiles.length - 1; i >= 0; i--) {
         let proj = projectiles[i];
@@ -693,38 +506,39 @@
         proj.x += dx;
         proj.y += dy;
         proj.traveled += Math.sqrt(dx*dx + dy*dy);
-        let dist = Math.hypot(proj.x - player.x, proj.y - player.y);
-        if(dist < player.size) {
-          if(Date.now() < player.dodgeEnd || Math.random() < player.dodgeChance) {
-            player.dodging = true;
-            player.dodgeEnd = Date.now() + 500;
-            player.effectImmunityEnd = Date.now() + 750;
-            player.stunned = false;
+        // Xác định đối tượng mục tiêu dựa trên owner
+        let target = (proj.owner === player.side) ? opponent : player;
+        let dist = Math.hypot(proj.x - target.x, proj.y - target.y);
+        if(dist < target.size) {
+          if(Date.now() < target.dodgeEnd || Math.random() < target.dodgeChance) {
+            target.dodging = true;
+            target.dodgeEnd = Date.now() + 500;
+            target.effectImmunityEnd = Date.now() + 750;
+            target.stunned = false;
             projectiles.splice(i, 1);
             continue;
           }
           let damage = proj.damage;
-          if((proj.type === "bullet" || proj.type === "fireball") && Math.random() < player.critChance) {
+          if((proj.type === "bullet" || proj.type === "fireball") && Math.random() < target.critChance) {
             damage *= 1.5;
           }
           if(proj.type === "bullet" || proj.type === "fireball") {
-            // Trừ sát thương từ "máu ảo" nếu có, ưu tiên trừ máu ảo trước
-            if('phantomHealth' in player && player.phantomHealth > 0 && Date.now() < player.phantomExpire) {
-              if(damage <= player.phantomHealth) {
-                player.phantomHealth -= damage;
+            if('phantomHealth' in target && target.phantomHealth > 0 && Date.now() < target.phantomExpire) {
+              if(damage <= target.phantomHealth) {
+                target.phantomHealth -= damage;
                 damage = 0;
               } else {
-                damage -= player.phantomHealth;
-                player.phantomHealth = 0;
+                damage -= target.phantomHealth;
+                target.phantomHealth = 0;
               }
             }
             if(damage > 0) {
-              player.health = Math.max(0, player.health - damage);
+              target.health = Math.max(0, target.health - damage);
             }
           } else if(proj.type === "bola") {
-            player.stunned = true;
-            player.stunStart = Date.now();
-            setTimeout(() => { player.stunned = false; player.stunStart = null; }, proj.stunDuration);
+            target.stunned = true;
+            target.stunStart = Date.now();
+            setTimeout(() => { target.stunned = false; target.stunStart = null; }, proj.stunDuration);
           }
           projectiles.splice(i, 1);
           continue;
@@ -760,14 +574,14 @@
         ctx.restore();
       });
     }
-    function drawStunEffect(player) {
+    function drawStunEffect(target) {
       let time = Date.now();
       let alpha = 0.5 + 0.5 * Math.sin(time/200);
       ctx.save();
       ctx.font = "24px Arial";
       ctx.fillStyle = `rgba(255,255,0,${alpha})`;
       ctx.textAlign = "center";
-      ctx.fillText("⛓️", player.x, player.y - player.size - 10);
+      ctx.fillText("⛓️", target.x, target.y - target.size - 10);
       ctx.restore();
     }
     function clearAllEffects() {
@@ -937,15 +751,14 @@
             this.attackDebuffActive = false;
           }
         }
-        if(!this.immobilized) {
-          if(keys[this.controls.left] && this.x > this.size) { this.x -= this.speed; }
-          if(keys[this.controls.right] && this.x < canvas.width - this.size) { this.x += this.speed; }
-          if(keys[this.controls.up] && this.y > this.size) { this.y -= this.speed; }
-          if(keys[this.controls.down] && this.y < canvas.height - this.size) { this.y += this.speed; }
-          if(keys[this.controls.left] || keys[this.controls.right] || keys[this.controls.up] || keys[this.controls.down]) {
-            this.lastDir = Math.atan2((keys[this.controls.down] ? 1 : 0) - (keys[this.controls.up] ? 1 : 0),
-                                       (keys[this.controls.right] ? 1 : 0) - (keys[this.controls.left] ? 1 : 0));
-          }
+        // Sử dụng clamp để đảm bảo nhân vật không vượt quá tường (cạnh canvas)
+        if(keys[this.controls.left]) { this.x = Math.max(this.size, this.x - this.speed); }
+        if(keys[this.controls.right]) { this.x = Math.min(canvas.width - this.size, this.x + this.speed); }
+        if(keys[this.controls.up]) { this.y = Math.max(this.size, this.y - this.speed); }
+        if(keys[this.controls.down]) { this.y = Math.min(canvas.height - this.size, this.y + this.speed); }
+        if(keys[this.controls.left] || keys[this.controls.right] || keys[this.controls.up] || keys[this.controls.down]) {
+          this.lastDir = Math.atan2((keys[this.controls.down] ? 1 : 0) - (keys[this.controls.up] ? 1 : 0),
+                                     (keys[this.controls.right] ? 1 : 0) - (keys[this.controls.left] ? 1 : 0));
         }
         // Xử lý tấn công (attack)
         if(keys[this.controls.attack] && Date.now() - this.lastAttackTime > ((this.ultimateActive && this.characterType==="archer") ? 0 : effectiveAttackCooldown)) {
@@ -1113,7 +926,6 @@
         document.getElementById("readyTimer").textContent = readyCountdown;
         if(readyCountdown <= 0) {
           clearInterval(readyTimerInterval);
-          // Nếu hết 30s mà chưa sẵn sàng thì thông báo và tải lại trang
           alert("Hết thời gian sẵn sàng! Vui lòng thử lại.");
           location.reload();
         }
@@ -1124,29 +936,24 @@
     document.getElementById("readyButton").addEventListener("click", () => {
       if (!localReady) {
         localReady = true;
-        // Cập nhật giao diện: ô của bạn chuyển màu xanh
         document.getElementById("localReady").classList.add("ready");
         document.getElementById("localReady").textContent = "Bạn: Sẵn sàng";
-        // Gửi sự kiện "player_ready" đến server
         socket.emit("player_ready", { roomId, playerId: socket.id });
       }
     });
     
-    // Khi nhận được sự kiện "opponent_ready" từ server, cập nhật giao diện
     socket.on("opponent_ready", () => {
       remoteReady = true;
       document.getElementById("opponentReady").classList.add("ready");
       document.getElementById("opponentReady").textContent = "Đối thủ: Sẵn sàng";
     });
     
-    // Khi server gửi "both_players_ready", chuyển giao diện vào trận đấu
     socket.on("both_players_ready", () => {
       clearInterval(readyTimerInterval);
       document.getElementById("waitingScreen").style.display = "none";
       gameLoop();
     });
     
-    // Cập nhật chuyển động của đối thủ
     socket.on("update_opponent_position", (data) => {
       if (opponent) {
         opponent.x = data.x;
@@ -1154,7 +961,6 @@
       }
     });
     
-    // Lắng nghe di chuyển của người chơi và gửi lên server
     function handlePlayerMovement() {
       if (player) {
         let prevX = player.x;
@@ -1166,7 +972,6 @@
       }
     }
     
-    // --- Vòng lặp game ---
     function gameLoop() {
       ctx.clearRect(0,0,canvas.width,canvas.height);
       handlePlayerMovement();
@@ -1224,29 +1029,11 @@
       }
     }
     
-    // --- Sự kiện chuyển màn hình ---
-    document.getElementById("instructionButton").addEventListener("click", () => {
-      document.getElementById("startScreen").style.display = "none";
-      document.getElementById("instructionScreen").style.display = "flex";
-    });
-    document.getElementById("infoButton").addEventListener("click", () => {
-      document.getElementById("startScreen").style.display = "none";
-      document.getElementById("characterInfoScreen").style.display = "flex";
-    });
-    document.getElementById("backFromInstruction").addEventListener("click", () => {
-      document.getElementById("instructionScreen").style.display = "none";
-      document.getElementById("startScreen").style.display = "flex";
-    });
-    document.getElementById("backFromInfo").addEventListener("click", () => {
-      document.getElementById("characterInfoScreen").style.display = "none";
-      document.getElementById("startScreen").style.display = "flex";
-    });
-    // Khi nhấn nút "Bắt đầu" từ startScreen, chuyển sang giao diện chọn class
+    // Sự kiện chuyển màn hình
     document.getElementById("startMenuButton").addEventListener("click", () => {
       document.getElementById("startScreen").style.display = "none";
       document.getElementById("characterSelectScreen").style.display = "flex";
     });
-    // Lắng nghe sự kiện chọn class
     const classButtons = document.querySelectorAll(".class-btn");
     classButtons.forEach(btn => {
       btn.addEventListener("click", () => {
@@ -1255,12 +1042,10 @@
         btn.classList.add("active");
       });
     });
-    // Khi nhấn nút "Tiếp theo" trong giao diện chọn class
     document.getElementById("nextButton").addEventListener("click", () => {
       localName = prompt("Nhập tên của bạn:") || "Player";
       socket.emit("find_match", { name: localName, character: selectedCharacterLeft });
       document.getElementById("characterSelectScreen").style.display = "none";
-      // Hiển thị waitingScreen với readyPanel
       document.getElementById("waitingScreen").style.display = "flex";
     });
     
@@ -1277,23 +1062,6 @@
     });
     document.getElementById("menuButton").addEventListener("click", () => {
       location.reload();
-    });
-    
-    // --- Mobile Controls: xử lý sự kiện touch ---
-    document.querySelectorAll(".move-btn, .skill-btn").forEach(btn => {
-      btn.addEventListener("touchstart", (e) => {
-        e.preventDefault();
-        let key = btn.getAttribute("data-key");
-        keys[key] = true;
-        if (socket.connected) {
-          socket.emit("player_move", { roomId, playerId: socket.id, key: key });
-        }
-      });
-      btn.addEventListener("touchend", (e) => {
-        e.preventDefault();
-        let key = btn.getAttribute("data-key");
-        keys[key] = false;
-      });
     });
   </script>
 </body>
