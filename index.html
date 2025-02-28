@@ -413,8 +413,8 @@
         ctx.lineTo(trail.endX, trail.endY);
         ctx.stroke();
         ctx.restore();
-        if (Date.now() - trail.startTime >= trail.duration) {
-          trails.splice(i, 1);
+        if (Date.now() - trail.startTime >= trail.duration) { 
+          trails.splice(i, 1); 
         } else {
           trail.lastUpdate = Date.now();
         }
@@ -935,7 +935,7 @@
           }
           startSkillCooldown("skill-ultimate-overlay", "skill-ultimate-timer", 40000);
         }
-        // Xử lý Special (phím "b")
+        // Xử lý Special (key "b")
         if(keys["b"] && Date.now() - this.lastSpecialTime >= this.specialCooldown) {
           this.lastSpecialTime = Date.now();
           triggerSpecialZone();
